@@ -227,7 +227,7 @@ export default function ShipperTransitPage() {
       </section>
 
       <div className="rounded-[24px] bg-[#fff7f5] px-5 py-4 text-sm text-[#8a6d68] ring-1 ring-[#f4e3df]">
-        <Link href="/shipper/delivered" className="inline-flex items-center gap-2 font-semibold text-[#dc2626] hover:underline">
+        <Link href="/shipper/report" className="inline-flex items-center gap-2 font-semibold text-[#dc2626] hover:underline">
           Xem báo cáo đơn đã giao
           <ArrowRight className="h-4 w-4" />
         </Link>

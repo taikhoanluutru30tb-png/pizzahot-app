@@ -140,7 +140,7 @@ function RevenueChart() {
   const max = Math.max(...revenueData.map((item) => item.value));
 
   return (
-    <div className="rounded-[28px] border border-[#efe2df] bg-white p-5 shadow-[0_10px_30px_rgba(97,39,25,0.06)] lg:p-6">
+    <div className="rounded-[32px] bg-[#fffdfc] p-5 shadow-[0_24px_60px_rgba(82,28,20,0.08)] lg:p-6">
       <div className="mb-5 flex items-start justify-between gap-3">
         <div>
           <h2 className="text-[1.05rem] font-extrabold text-[#2f1f1b] lg:text-[1.15rem]">Thống kê doanh thu</h2>
@@ -180,17 +180,19 @@ function RevenueChart() {
 export default function AdminDashboardPage() {
   return (
     <div className="space-y-6 lg:space-y-8">
-      <section className="flex flex-col gap-4 rounded-[30px] bg-[#fff9f7] p-4 shadow-[0_12px_40px_rgba(97,39,25,0.05)] ring-1 ring-[#f0dfda] lg:flex-row lg:items-end lg:justify-between lg:p-6">
-        <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#b08d85]">Chào buổi sáng</p>
-          <h1 className="mt-2 text-[1.9rem] font-black tracking-tight text-[#231714] lg:text-[2.5rem]">Admin, xin chào!</h1>
-          <p className="mt-2 max-w-2xl text-sm text-[#9f827c] lg:text-base">Dưới đây là tóm tắt hoạt động hôm nay của Pizza Hot.</p>
-        </div>
+      <section className="overflow-hidden rounded-[32px] bg-gradient-to-br from-[#fff8f5] via-[#fffdfc] to-[#f6ebe8] p-5 shadow-[0_24px_60px_rgba(82,28,20,0.08)] lg:p-8">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-3xl">
+            <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#b4534c]">Chào buổi sáng</p>
+            <h1 className="mt-3 text-[2.2rem] font-black tracking-tight text-[#2b1814] lg:text-[4rem]">Admin, xin chào!</h1>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-[#8f6f68] lg:text-[1rem]">Dưới đây là tóm tắt hoạt động hôm nay của Pizza Hot.</p>
+          </div>
 
-        <button className="inline-flex items-center justify-center gap-2 self-start rounded-2xl bg-[#c62828] px-5 py-3 text-sm font-bold text-white shadow-[0_10px_24px_rgba(198,40,40,0.25)] transition hover:bg-[#a91f1f]">
-          <CalendarRange className="h-4 w-4" />
-          Chốt Ca
-        </button>
+          <button className="inline-flex items-center justify-center gap-2 self-start rounded-full bg-gradient-to-r from-[#b91c1c] to-[#dc2626] px-6 py-3 text-sm font-bold text-white shadow-[0_18px_30px_rgba(185,28,28,0.22)] transition hover:brightness-95">
+            <CalendarRange className="h-4 w-4" />
+            Chốt Ca
+          </button>
+        </div>
       </section>
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -200,7 +202,7 @@ export default function AdminDashboardPage() {
           return (
             <article
               key={metric.title}
-              className={`rounded-[26px] border border-[#efe2df] p-5 shadow-[0_10px_28px_rgba(97,39,25,0.06)] ${metric.bgClass}`}
+              className={`rounded-[28px] p-5 shadow-[0_24px_60px_rgba(82,28,20,0.08)] ${metric.bgClass}`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div>

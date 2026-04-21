@@ -81,7 +81,7 @@ export default function StaffAttendancePage() {
 
   return (
     <div className="space-y-6 pb-6">
-      <section className="overflow-hidden rounded-[28px] bg-gradient-to-br from-[#ef4444] via-[#dc2626] to-[#f97316] p-5 text-white shadow-[0_18px_50px_rgba(220,38,38,0.28)] sm:p-6">
+      <section className="overflow-hidden rounded-[32px] bg-gradient-to-br from-[#b91c1c] via-[#dc2626] to-[#f97316] p-5 text-white shadow-[0_24px_60px_rgba(82,28,20,0.16)] sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.28em] text-white/90">

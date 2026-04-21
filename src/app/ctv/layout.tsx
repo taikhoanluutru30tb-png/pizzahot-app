@@ -30,10 +30,10 @@ type NavItem = {
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/ctv", icon: Home },
-  { label: "Create Order", href: "/ctv/create-order", icon: SquarePen },
-  { label: "Order", href: "/ctv/orders", icon: ShoppingBag },
-  { label: "Message", href: "/ctv/message", icon: MessageSquare },
-  { label: "User Profile", href: "/ctv/profile", icon: UserRoundPen },
+  { label: "Tạo đơn hàng", href: "/ctv/create-order", icon: SquarePen },
+  { label: "Lịch sử đơn hàng", href: "/ctv/orders", icon: ShoppingBag },
+  { label: "Tin nhắn", href: "/ctv/message", icon: MessageSquare },
+  { label: "Hồ sơ", href: "/ctv/profile", icon: UserRoundPen },
 ];
 
 function isCtvRole(role: unknown): role is CtvRole {

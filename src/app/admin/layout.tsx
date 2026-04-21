@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
@@ -31,16 +32,16 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { label: "Trang chủ", href: "/admin", icon: LayoutDashboard },
-  { label: "Báo cáo", href: "/admin/reports", icon: BarChart3 },
-  { label: "Tạo đơn hàng", href: "/admin/orders/new", icon: PackagePlus },
+  { label: "Dashboard", href: "/admin", icon: LayoutDashboard },
+  { label: "Báo cáo", href: "/admin/report", icon: BarChart3 },
+  { label: "Tạo đơn hàng", href: "/admin/create-order", icon: PackagePlus },
+  { label: "Quản lý thực đơn", href: "/admin/menu", icon: UtensilsCrossed },
   { label: "Quản lý đơn hàng", href: "/admin/orders", icon: ClipboardList },
-  { label: "Đơn hàng", href: "/admin/orders/active", icon: ShoppingBag },
-  { label: "Nhân sự", href: "/admin/staff", icon: Users },
-  { label: "Món ăn", href: "/admin/menu", icon: UtensilsCrossed },
-  { label: "Vị trí", href: "/admin/branches", icon: Store },
-  { label: "Tin nhắn", href: "/admin/messages", icon: MessageSquareText },
-  { label: "Cá nhân", href: "/admin/profile", icon: Settings2 },
+  { label: "Điều phối giao hàng", href: "/admin/delivery", icon: ShoppingBag },
+  { label: "Quản lý nhân sự", href: "/admin/hr", icon: Users },
+  { label: "Tin nhắn", href: "/admin/message", icon: MessageSquareText },
+  { label: "Hồ sơ cá nhân", href: "/admin/profile", icon: Settings2 },
+  { label: "Cài đặt chấm công", href: "/admin/timekeeping", icon: Store },
 ];
 
 function isAdminRole(role: unknown): role is AdminRole {
@@ -105,7 +106,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
 
             return (
-              <a
+              <Link
                 key={item.href}
                 href={item.href}
                 className={`flex items-center justify-between rounded-[18px] px-5 py-4 text-[1.05rem] font-semibold transition ${active ? "bg-[#dc2626] text-white shadow-lg shadow-[#dc2626]/20" : "bg-white text-[#5c4340] hover:bg-[#f4e9e7]"}`}
@@ -115,7 +116,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                   <span>{item.label}</span>
                 </span>
                 <ChevronRight className="h-4 w-4 opacity-70" />
-              </a>
+              </Link>
             );
           })}
         </nav>
@@ -174,7 +175,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                 const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
 
                 return (
-                  <a
+                  <Link
                     key={item.href}
                     href={item.href}
                     onClick={() => setMobileMenuOpen(false)}
@@ -182,7 +183,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                   >
                     <Icon className="h-5 w-5" />
                     <span>{item.label}</span>
-                  </a>
+                  </Link>
                 );
               })}
             </div>
@@ -201,14 +202,14 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
 
             return (
-              <a
+              <Link
                 key={item.href}
                 href={item.href}
                 className={`flex flex-col items-center justify-center rounded-2xl px-2 py-2 text-[11px] font-medium ${active ? "bg-[#dc2626] text-white" : "text-[#7f625d]"}`}
               >
                 <Icon className="mb-1 h-5 w-5" />
                 <span className="truncate">{item.label}</span>
-              </a>
+              </Link>
             );
           })}
         </div>

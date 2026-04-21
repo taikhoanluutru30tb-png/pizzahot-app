@@ -27,10 +27,10 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { label: "Orders in transit", href: "/shipper", icon: LayoutDashboard },
-  { label: "Delivered Report", href: "/shipper/delivered", icon: CheckCircle2 },
-  { label: "Message", href: "/shipper/messages", icon: MessageSquareText },
-  { label: "User Profile", href: "/shipper/profile", icon: UserRound },
+  { label: "Đơn đang giao", href: "/shipper", icon: LayoutDashboard },
+  { label: "Báo cáo đơn đã giao", href: "/shipper/report", icon: CheckCircle2 },
+  { label: "Tin nhắn", href: "/shipper/message", icon: MessageSquareText },
+  { label: "Hồ sơ", href: "/shipper/profile", icon: UserRound },
 ];
 
 function isShipperRole(role: unknown): role is ShipperRole {

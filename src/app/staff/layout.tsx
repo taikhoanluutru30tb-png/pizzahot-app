@@ -27,11 +27,11 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { label: "Chấm công", href: "/staff/attendance", icon: CalendarCheck2 },
-  { label: "Tạo đơn", href: "/staff/orders/new", icon: PackagePlus },
-  { label: "Điều phối", href: "/staff/dispatch", icon: ArrowRightLeft },
-  { label: "Tin nhắn", href: "/staff/messages", icon: MessageSquareText },
-  { label: "Profile", href: "/staff/profile", icon: UserRound },
+  { label: "Chấm công", href: "/staff", icon: CalendarCheck2 },
+  { label: "Tạo đơn hàng", href: "/staff/create-order", icon: PackagePlus },
+  { label: "Điều phối", href: "/staff/delivery", icon: ArrowRightLeft },
+  { label: "Tin nhắn", href: "/staff/message", icon: MessageSquareText },
+  { label: "Hồ sơ", href: "/staff/profile", icon: UserRound },
 ];
 
 function isStaffRole(role: unknown): role is StaffRole {
