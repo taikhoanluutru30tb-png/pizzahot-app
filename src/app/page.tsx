@@ -7,9 +7,9 @@ import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "./lib/firebase";
 
 const IT_SUPPORT_PHONE = "0348726823";
+const SUPPORT_EMAIL = "quanlypizzahot@gmail.com";
 
 type Role = "admin" | "staff" | "ctv" | "shipper";
-
 
 const ROLE_CARDS: Array<{
   id: Role;
@@ -130,13 +130,20 @@ export default function Page() {
         throw new Error("Tài khoản không được cấp quyền sử dụng hệ thống.");
       }
 
-      const roleValue = normalizeRole(userSnap.data()?.role);
-      if (!roleValue) {
+      const userData = userSnap.data();
+      const isSupportAccount = email.trim().toLowerCase() === SUPPORT_EMAIL;
+      const roleValue = normalizeRole(userData?.role);
+      const accountRole = roleValue ?? (isSupportAccount ? "admin" : null);
+
+      if (!accountRole) {
         throw new Error("Không xác định được vai trò người dùng.");
       }
 
-      const accountRole = roleValue;
-      const allowedRoles = ROLE_ACCESS[accountRole] ?? [accountRole];
+      if (userData?.blocked === true) {
+        throw new Error("Tài khoản đã bị khóa.");
+      }
+
+      const allowedRoles = isSupportAccount ? ROLE_ACCESS.admin : ROLE_ACCESS[accountRole] ?? [accountRole];
       if (!allowedRoles.includes(activeRole)) {
         throw new Error("Tài khoản này không có quyền đăng nhập với vai trò đã chọn.");
       }

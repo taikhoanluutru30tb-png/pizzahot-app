@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 import { auth, db } from "../lib/firebase";
 
+const SUPPORT_EMAIL = "quanlypizzahot@gmail.com";
+
 type AdminRole = "admin";
 
 type NavItem = {
@@ -47,6 +49,10 @@ function isAdminRole(role: unknown): role is AdminRole {
   return role === "admin";
 }
 
+function isSupportEmail(value: unknown): value is string {
+  return typeof value === "string" && value.toLowerCase() === SUPPORT_EMAIL;
+}
+
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -62,9 +68,11 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
       try {
         const userSnap = await getDoc(doc(db, "users", user.uid));
-        const role = userSnap.data()?.role;
+        const userData = userSnap.data();
+        const role = userData?.role;
+        const canAccessAsSupport = isSupportEmail(user.email) && userData?.blocked !== true;
 
-        if (!userSnap.exists() || !isAdminRole(role)) {
+        if (!userSnap.exists() || (!isAdminRole(role) && !canAccessAsSupport)) {
           await signOut(auth);
           setLoading(false);
           router.replace("/");
