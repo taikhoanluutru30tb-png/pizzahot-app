@@ -1,6 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { FormEvent } from "react";
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  updateDoc,
+} from "firebase/firestore";
 import {
   ArrowDownWideNarrow,
   ChefHat,
@@ -11,89 +23,49 @@ import {
   Search,
   Trash2,
   UtensilsCrossed,
+  X,
 } from "lucide-react";
+
+import { db } from "@/app/lib/firebase";
 
 type MenuItem = {
   id: string;
   name: string;
-  category: string;
   price: number;
-  image: string;
-  featured?: boolean;
+  category: string;
   description: string;
+  imageUrl: string;
 };
 
-const categories = ["Tất cả", "Pizza", "Burgers", "Drinks", "Sides"] as const;
+type MenuFormState = {
+  name: string;
+  price: string;
+  category: string;
+  description: string;
+  imageUrl: string;
+};
 
-const menuItems: MenuItem[] = [
-  {
-    id: "PH-1029",
-    name: "Pizza Phô Mai Hảo Hạng",
-    category: "Pizza",
-    price: 189000,
-    image:
-      "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=640&q=80",
-    featured: true,
-    description: "Pizza • Bestseller",
-  },
-  {
-    id: "BG-2044",
-    name: "Burger Bò Mỹ Phô Mai",
-    category: "Burgers",
-    price: 125000,
-    image:
-      "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=640&q=80",
-    description: "Burger • Popular",
-  },
-  {
-    id: "DR-8821",
-    name: "Nước Ép Cam Nguyên Chất",
-    category: "Drinks",
-    price: 45000,
-    image:
-      "https://images.unsplash.com/photo-1505252585461-04db1eb84625?auto=format&fit=crop&w=640&q=80",
-    description: "Drinks • Fresh",
-  },
-  {
-    id: "SD-4410",
-    name: "Khoai Tây Chiên Giòn",
-    category: "Sides",
-    price: 59000,
-    image:
-      "https://images.unsplash.com/photo-1573080496219-bb080dd4f877?auto=format&fit=crop&w=640&q=80",
-    description: "Sides • Snack",
-  },
-  {
-    id: "PZ-5512",
-    name: "Pizza Hải Sản Đế Mỏng",
-    category: "Pizza",
-    price: 229000,
-    image:
-      "https://images.unsplash.com/photo-1541745537411-b8046dc6d66c?auto=format&fit=crop&w=640&q=80",
-    description: "Pizza • Premium",
-  },
-  {
-    id: "DR-7602",
-    name: "Soda Chanh Mát Lạnh",
-    category: "Drinks",
-    price: 39000,
-    image:
-      "https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&w=640&q=80",
-    description: "Drinks • Sparkling",
-  },
-];
+const emptyForm: MenuFormState = {
+  name: "",
+  price: "",
+  category: "Pizza",
+  description: "",
+  imageUrl: "",
+};
 
-const formatCurrency = (value: number) =>
-  new Intl.NumberFormat("vi-VN", {
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("vi-VN", {
     style: "currency",
     currency: "VND",
     maximumFractionDigits: 0,
   }).format(value);
+}
 
-function ActionButton({ icon: Icon, label, tone = "neutral" }: { icon: LucideIcon; label: string; tone?: "neutral" | "danger" }) {
+function ActionButton({ icon: Icon, label, tone = "neutral", onClick }: { icon: LucideIcon; label: string; tone?: "neutral" | "danger"; onClick: () => void }) {
   return (
     <button
       type="button"
+      onClick={onClick}
       aria-label={label}
       className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border transition ${
         tone === "danger"
@@ -107,23 +79,156 @@ function ActionButton({ icon: Icon, label, tone = "neutral" }: { icon: LucideIco
 }
 
 export default function AdminMenuPage() {
+  const [items, setItems] = useState<MenuItem[]>([]);
   const [search, setSearch] = useState("");
-  const [activeCategory, setActiveCategory] = useState<(typeof categories)[number]>("Tất cả");
+  const [activeCategory, setActiveCategory] = useState("Tất cả");
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
+  const [form, setForm] = useState<MenuFormState>(emptyForm);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    const q = query(collection(db, "menu"), orderBy("createdAt", "desc"));
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const nextItems = snapshot.docs.map((document) => {
+          const data = document.data();
+          return {
+            id: document.id,
+            name: String(data.name ?? ""),
+            price: Number(data.price ?? 0),
+            category: String(data.category ?? ""),
+            description: String(data.description ?? ""),
+            imageUrl: String(data.imageUrl ?? ""),
+          } satisfies MenuItem;
+        });
+
+        setItems(nextItems);
+      },
+      (snapshotError) => {
+        setError(snapshotError.message || "Không thể tải dữ liệu menu.");
+      },
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  const categories = useMemo(() => {
+    const unique = Array.from(new Set(items.map((item) => item.category).filter(Boolean)));
+    return ["Tất cả", ...unique];
+  }, [items]);
+
+  useEffect(() => {
+    if (!categories.includes(activeCategory)) {
+      setActiveCategory("Tất cả");
+    }
+  }, [activeCategory, categories]);
 
   const filteredItems = useMemo(() => {
-    const query = search.trim().toLowerCase();
-
-    return menuItems.filter((item) => {
+    const queryText = search.trim().toLowerCase();
+    return items.filter((item) => {
       const matchesCategory = activeCategory === "Tất cả" || item.category === activeCategory;
       const matchesSearch =
-        !query ||
-        item.name.toLowerCase().includes(query) ||
-        item.category.toLowerCase().includes(query) ||
-        item.id.toLowerCase().includes(query);
-
+        !queryText ||
+        item.name.toLowerCase().includes(queryText) ||
+        item.category.toLowerCase().includes(queryText) ||
+        item.description.toLowerCase().includes(queryText);
       return matchesCategory && matchesSearch;
     });
-  }, [search, activeCategory]);
+  }, [activeCategory, items, search]);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    setSuccess(null);
+
+    if (!form.name.trim() || !form.category.trim() || !form.imageUrl.trim()) {
+      setError("Vui lòng nhập Tên món, Phân loại và Link ảnh.");
+      return;
+    }
+
+    const priceNumber = Number(form.price);
+    if (Number.isNaN(priceNumber) || priceNumber < 0) {
+      setError("Giá phải là một số hợp lệ và lớn hơn hoặc bằng 0.");
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      const payload = {
+        name: form.name.trim(),
+        price: priceNumber,
+        category: form.category.trim(),
+        description: form.description.trim(),
+        imageUrl: form.imageUrl.trim(),
+      };
+
+      if (editingItem) {
+        await updateDoc(doc(db, "menu", editingItem.id), payload);
+        setSuccess("Đã cập nhật món ăn.");
+      } else {
+        await addDoc(collection(db, "menu"), {
+          ...payload,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+        setSuccess("Đã thêm món ăn mới.");
+      }
+
+      setForm(emptyForm);
+      setEditingItem(null);
+      setIsFormOpen(false);
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "Đã xảy ra lỗi khi lưu dữ liệu.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  function openCreateForm() {
+    setEditingItem(null);
+    setForm(emptyForm);
+    setError(null);
+    setSuccess(null);
+    setIsFormOpen(true);
+  }
+
+  function openEditForm(item: MenuItem) {
+    setEditingItem(item);
+    setForm({
+      name: item.name,
+      price: String(item.price),
+      category: item.category,
+      description: item.description,
+      imageUrl: item.imageUrl,
+    });
+    setError(null);
+    setSuccess(null);
+    setIsFormOpen(true);
+  }
+
+  async function handleDelete(id: string) {
+    const confirmed = window.confirm("Bạn có chắc chắn muốn xóa món ăn này không?");
+    if (!confirmed) return;
+
+    try {
+      await deleteDoc(doc(db, "menu", id));
+      setSuccess("Đã xóa món ăn.");
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "Không thể xóa món ăn.");
+    }
+  }
+
+  function closeForm() {
+    if (isSaving) return;
+    setIsFormOpen(false);
+    setEditingItem(null);
+    setForm(emptyForm);
+  }
 
   return (
     <main className="space-y-5 pb-4 text-[#4b342f] sm:space-y-6 lg:space-y-8">
@@ -133,13 +238,14 @@ export default function AdminMenuPage() {
             <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#b28b84]">Quản lý thực đơn</p>
             <h1 className="mt-2 text-[clamp(1.7rem,4vw,2.6rem)] font-black tracking-tight text-[#241614]">Menu Management</h1>
             <p className="mt-2 text-sm text-[#9b7d78] lg:text-base">
-              Tìm kiếm, thêm mới, chỉnh sửa và xóa món ăn. Giao diện tối ưu desktop với table, mobile chuyển sang card để không bị tràn ngang.
+              CRUD realtime với Firestore collection <span className="font-semibold text-[#6f5752]">menu</span>. Danh sách tự động cập nhật bằng <span className="font-semibold text-[#6f5752]">onSnapshot</span>.
             </p>
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <button
               type="button"
+              onClick={openCreateForm}
               className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#c62828] px-5 py-3.5 font-bold text-white shadow-[0_12px_24px_rgba(198,40,40,0.22)] transition hover:bg-[#a91f1f]"
             >
               <Plus className="h-4 w-4" />
@@ -148,6 +254,13 @@ export default function AdminMenuPage() {
           </div>
         </div>
       </section>
+
+      {error ? (
+        <div className="rounded-2xl border border-[#f2d1d1] bg-[#fff7f7] px-4 py-3 text-sm font-medium text-[#b42318]">{error}</div>
+      ) : null}
+      {success ? (
+        <div className="rounded-2xl border border-[#d9f0df] bg-[#f3fbf5] px-4 py-3 text-sm font-medium text-[#1f7a39]">{success}</div>
+      ) : null}
 
       <section className="rounded-[28px] border border-[#efdfdc] bg-white p-4 shadow-[0_12px_40px_rgba(97,39,25,0.06)] sm:p-5 lg:p-6">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -168,7 +281,7 @@ export default function AdminMenuPage() {
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Tìm tên món, mã món..."
+                placeholder="Tìm tên, loại, mô tả..."
                 className="w-full rounded-2xl border border-[#e7dbd8] bg-[#fcfaf9] py-3 pl-11 pr-4 text-sm font-medium text-[#4d3b37] outline-none transition placeholder:text-[#b99c95] focus:border-[#c62828] focus:bg-white"
               />
             </label>
@@ -216,8 +329,7 @@ export default function AdminMenuPage() {
             <thead className="bg-[#fcf8f7]">
               <tr className="text-left text-[11px] font-extrabold uppercase tracking-[0.18em] text-[#a78b85]">
                 <th className="px-4 py-4">Món ăn</th>
-                <th className="px-4 py-4">Mã</th>
-                <th className="px-4 py-4">Danh mục</th>
+                <th className="px-4 py-4">Phân loại</th>
                 <th className="px-4 py-4">Giá</th>
                 <th className="px-4 py-4 text-right">Hành động</th>
               </tr>
@@ -227,25 +339,13 @@ export default function AdminMenuPage() {
                 <tr key={item.id} className="align-middle transition hover:bg-[#fffdfc]">
                   <td className="px-4 py-4">
                     <div className="flex items-center gap-4">
-                      <img
-                        src={item.image}
-                        alt={item.name}
-                        className="h-14 w-14 rounded-2xl object-cover ring-1 ring-[#edded9]"
-                      />
+                      <img src={item.imageUrl} alt={item.name} className="h-14 w-14 rounded-2xl object-cover ring-1 ring-[#edded9]" />
                       <div>
-                        <div className="flex items-center gap-2">
-                          <p className="font-extrabold text-[#261815]">{item.name}</p>
-                          {item.featured ? (
-                            <span className="rounded-full bg-[#fff0ef] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#c62828]">
-                              Nổi bật
-                            </span>
-                          ) : null}
-                        </div>
-                        <p className="mt-1 text-sm text-[#9d7f79]">{item.description}</p>
+                        <p className="font-extrabold text-[#261815]">{item.name}</p>
+                        <p className="mt-1 line-clamp-2 text-sm text-[#9d7f79]">{item.description || "Không có mô tả"}</p>
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-4 text-sm font-semibold text-[#7e6560]">#{item.id}</td>
                   <td className="px-4 py-4">
                     <span className="inline-flex rounded-full bg-[#f8f2f1] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-[#8a6f69]">
                       {item.category}
@@ -256,6 +356,7 @@ export default function AdminMenuPage() {
                     <div className="flex justify-end gap-2">
                       <button
                         type="button"
+                        onClick={() => openEditForm(item)}
                         className="inline-flex items-center gap-2 rounded-xl border border-[#eadad5] bg-white px-3 py-2 text-sm font-semibold text-[#6f5752] transition hover:bg-[#faf6f5]"
                       >
                         <Edit3 className="h-4 w-4" />
@@ -263,6 +364,7 @@ export default function AdminMenuPage() {
                       </button>
                       <button
                         type="button"
+                        onClick={() => handleDelete(item.id)}
                         className="inline-flex items-center gap-2 rounded-xl border border-[#f2d1d1] bg-[#fff7f7] px-3 py-2 text-sm font-semibold text-[#c62828] transition hover:bg-[#ffecec]"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -280,26 +382,16 @@ export default function AdminMenuPage() {
           {filteredItems.map((item) => (
             <article key={item.id} className="rounded-[24px] border border-[#f0e3df] bg-[#fffdfc] p-4 shadow-[0_8px_24px_rgba(97,39,25,0.04)]">
               <div className="flex gap-4">
-                <img src={item.image} alt={item.name} className="h-20 w-20 rounded-2xl object-cover ring-1 ring-[#edded9]" />
+                <img src={item.imageUrl} alt={item.name} className="h-20 w-20 rounded-2xl object-cover ring-1 ring-[#edded9]" />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="truncate text-base font-extrabold text-[#261815]">{item.name}</h3>
-                        {item.featured ? (
-                          <span className="rounded-full bg-[#fff0ef] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#c62828]">
-                            Nổi bật
-                          </span>
-                        ) : null}
-                      </div>
-                      <p className="mt-1 text-sm text-[#9d7f79]">{item.description}</p>
+                      <h3 className="truncate text-base font-extrabold text-[#261815]">{item.name}</h3>
+                      <p className="mt-1 text-sm text-[#9d7f79]">{item.description || "Không có mô tả"}</p>
                     </div>
-                    <span className="shrink-0 rounded-xl bg-[#fff0ef] px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[#c62828]">
-                      #{item.id}
-                    </span>
                   </div>
 
-                  <div className="mt-3 flex items-center gap-2">
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
                     <span className="rounded-full bg-[#f8f2f1] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-[#8a6f69]">
                       {item.category}
                     </span>
@@ -309,8 +401,8 @@ export default function AdminMenuPage() {
               </div>
 
               <div className="mt-4 flex items-center justify-end gap-2 border-t border-[#f3e8e5] pt-4">
-                <ActionButton icon={Edit3} label={`Sửa ${item.name}`} />
-                <ActionButton icon={Trash2} label={`Xóa ${item.name}`} tone="danger" />
+                <ActionButton icon={Edit3} label={`Sửa ${item.name}`} onClick={() => openEditForm(item)} />
+                <ActionButton icon={Trash2} label={`Xóa ${item.name}`} tone="danger" onClick={() => handleDelete(item.id)} />
               </div>
             </article>
           ))}
@@ -322,10 +414,106 @@ export default function AdminMenuPage() {
               <ChefHat className="h-6 w-6" />
             </div>
             <h3 className="mt-4 text-lg font-extrabold text-[#251714]">Không tìm thấy món ăn phù hợp</h3>
-            <p className="mt-2 text-sm text-[#9d7f79]">Thử thay đổi từ khóa tìm kiếm hoặc bộ lọc danh mục.</p>
+            <p className="mt-2 text-sm text-[#9d7f79]">Thử thay đổi từ khóa tìm kiếm hoặc thêm món mới.</p>
           </div>
         ) : null}
       </section>
+
+      {isFormOpen ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 backdrop-blur-sm sm:items-center">
+          <div className="w-full max-w-2xl overflow-hidden rounded-[28px] bg-white shadow-[0_24px_80px_rgba(0,0,0,0.24)]">
+            <div className="flex items-start justify-between border-b border-[#f2e7e4] px-5 py-4 sm:px-6">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#b28b84]">{editingItem ? "Cập nhật món ăn" : "Thêm món ăn"}</p>
+                <h2 className="mt-1 text-xl font-black text-[#241614]">{editingItem ? "Chỉnh sửa menu" : "Tạo món mới"}</h2>
+              </div>
+              <button
+                type="button"
+                onClick={closeForm}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#eadad5] text-[#6f5752] transition hover:bg-[#faf6f5]"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="grid gap-4 px-5 py-5 sm:px-6">
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold text-[#5b4742]">Tên món</span>
+                  <input
+                    value={form.name}
+                    onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+                    className="rounded-2xl border border-[#e7dbd8] bg-[#fcfaf9] px-4 py-3 outline-none transition focus:border-[#c62828]"
+                    placeholder="Ví dụ: Pizza Hải Sản"
+                  />
+                </label>
+
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold text-[#5b4742]">Giá</span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={form.price}
+                    onChange={(e) => setForm((prev) => ({ ...prev, price: e.target.value }))}
+                    className="rounded-2xl border border-[#e7dbd8] bg-[#fcfaf9] px-4 py-3 outline-none transition focus:border-[#c62828]"
+                    placeholder="120000"
+                  />
+                </label>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold text-[#5b4742]">Phân loại</span>
+                  <input
+                    value={form.category}
+                    onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))}
+                    className="rounded-2xl border border-[#e7dbd8] bg-[#fcfaf9] px-4 py-3 outline-none transition focus:border-[#c62828]"
+                    placeholder="Pizza / Burger / Drinks..."
+                  />
+                </label>
+
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold text-[#5b4742]">Link ảnh</span>
+                  <input
+                    type="url"
+                    value={form.imageUrl}
+                    onChange={(e) => setForm((prev) => ({ ...prev, imageUrl: e.target.value }))}
+                    className="rounded-2xl border border-[#e7dbd8] bg-[#fcfaf9] px-4 py-3 outline-none transition focus:border-[#c62828]"
+                    placeholder="https://..."
+                  />
+                </label>
+              </div>
+
+              <label className="grid gap-2">
+                <span className="text-sm font-semibold text-[#5b4742]">Mô tả</span>
+                <textarea
+                  value={form.description}
+                  onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
+                  className="min-h-[120px] rounded-2xl border border-[#e7dbd8] bg-[#fcfaf9] px-4 py-3 outline-none transition focus:border-[#c62828]"
+                  placeholder="Mô tả ngắn về món ăn"
+                />
+              </label>
+
+              <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={closeForm}
+                  className="rounded-2xl border border-[#e7dbd8] bg-white px-5 py-3 font-semibold text-[#6f5752] transition hover:bg-[#faf6f5]"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="rounded-2xl bg-[#c62828] px-5 py-3 font-bold text-white transition hover:bg-[#a91f1f] disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {isSaving ? "Đang lưu..." : editingItem ? "Cập nhật món ăn" : "Thêm món ăn"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

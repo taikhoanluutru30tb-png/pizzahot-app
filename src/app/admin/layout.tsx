@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { onAuthStateChanged, type User } from "firebase/auth";
+import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import {
   BarChart3,
@@ -57,6 +57,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
       if (!user) {
+        setLoading(false);
         router.replace("/");
         return;
       }
@@ -66,14 +67,16 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         const role = userSnap.data()?.role;
 
         if (!userSnap.exists() || !isAdminRole(role)) {
-          await auth.signOut();
+          await signOut(auth);
+          setLoading(false);
           router.replace("/");
           return;
         }
 
         setLoading(false);
       } catch {
-        await auth.signOut();
+        await signOut(auth);
+        setLoading(false);
         router.replace("/");
       }
     });
@@ -132,7 +135,15 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             </div>
           </div>
           <div className="mt-4 flex gap-3">
-            <button className="grid h-11 w-11 place-items-center rounded-2xl bg-[#dc2626] text-white transition hover:bg-[#b91c1c]">
+            <button
+              type="button"
+              onClick={async () => {
+                await signOut(auth);
+                router.replace("/");
+              }}
+              className="grid h-11 w-11 place-items-center rounded-2xl bg-[#dc2626] text-white transition hover:bg-[#b91c1c]"
+              aria-label="Đăng xuất"
+            >
               <LogOut className="h-5 w-5" />
             </button>
             <button className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-[#dc2626] px-4 py-3 font-semibold text-white transition hover:bg-[#b91c1c]">
@@ -197,7 +208,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
       <nav className="fixed bottom-0 left-0 right-0 z-30 border-t border-[#eddcda] bg-white/95 px-2 py-2 backdrop-blur lg:hidden">
         <div className="grid grid-cols-5 gap-1">
-          {NAV_ITEMS.slice(0, 5).map((item) => {
+          {NAV_ITEMS.slice(0, 4).map((item) => {
             const Icon = item.icon;
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
 
@@ -212,6 +223,17 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               </Link>
             );
           })}
+          <button
+            type="button"
+            onClick={async () => {
+              await signOut(auth);
+              router.replace("/");
+            }}
+            className="flex flex-col items-center justify-center rounded-2xl px-2 py-2 text-[11px] font-medium text-[#7f625d]"
+          >
+            <LogOut className="mb-1 h-5 w-5" />
+            <span className="truncate">Đăng xuất</span>
+          </button>
         </div>
       </nav>
     </div>

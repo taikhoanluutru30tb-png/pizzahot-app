@@ -1,55 +1,96 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { collection, onSnapshot, orderBy, query, where } from "firebase/firestore";
 import { BarChart3, Coins, ShoppingBag, UserCircle2 } from "lucide-react";
 
-type StatCard = {
-  title: string;
-  value: string;
-  subtitle: string;
-  icon: typeof BarChart3;
-  iconClassName: string;
-  cardClassName: string;
+import { db } from "@/app/lib/firebase";
+
+type FirestoreOrder = {
+  id: string;
+  tong_tien?: number;
+  trang_thai?: string;
+  nguoi_tao?: string;
 };
 
-const stats: StatCard[] = [
-  {
-    title: "Tổng doanh thu",
-    value: "8.450.000đ",
-    subtitle: "Doanh thu tích lũy trong tháng",
-    icon: BarChart3,
-    iconClassName: "text-sky-500",
-    cardClassName: "bg-white",
-  },
-  {
-    title: "Số đơn thành công",
-    value: "482",
-    subtitle: "Đơn đã hoàn tất và thanh toán",
-    icon: ShoppingBag,
-    iconClassName: "text-violet-500",
-    cardClassName: "bg-white",
-  },
-  {
-    title: "Hoa hồng tạm tính",
-    value: "1.250.000đ",
-    subtitle: "Dự kiến nhận trong kỳ này",
-    icon: Coins,
-    iconClassName: "text-red-500",
-    cardClassName: "bg-gradient-to-br from-[#b91c1c] to-[#ef4444] text-white",
-  },
-];
+const CTV_UID = "ctv-demo-uid";
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
 
 export default function CtvPage() {
+  const [orders, setOrders] = useState<FirestoreOrder[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const q = query(
+      collection(db, "orders"),
+      where("nguoi_tao", "==", CTV_UID),
+      orderBy("thoi_gian_tao", "desc"),
+    );
+
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const items = snapshot.docs.map((document) => ({ id: document.id, ...document.data() } as FirestoreOrder));
+        setOrders(items);
+      },
+      (snapshotError) => setError(snapshotError.message || "Không thể tải dữ liệu dashboard CTV."),
+    );
+  }, []);
+
+  const completedOrders = useMemo(
+    () => orders.filter((order) => order.trang_thai === "Hoàn thành"),
+    [orders],
+  );
+
+  const totalRevenue = useMemo(
+    () => completedOrders.reduce((sum, order) => sum + Number(order.tong_tien ?? 0), 0),
+    [completedOrders],
+  );
+
+  const commission = useMemo(() => totalRevenue * 0.1, [totalRevenue]);
+
+  const stats = [
+    {
+      title: "Tổng doanh thu",
+      value: formatCurrency(totalRevenue),
+      subtitle: "Doanh thu từ đơn hoàn thành",
+      icon: BarChart3,
+      iconClassName: "text-sky-500",
+      cardClassName: "bg-white",
+    },
+    {
+      title: "Số đơn thành công",
+      value: String(completedOrders.length),
+      subtitle: "Đơn đã hoàn tất và thanh toán",
+      icon: ShoppingBag,
+      iconClassName: "text-violet-500",
+      cardClassName: "bg-white",
+    },
+    {
+      title: "Hoa hồng tạm tính",
+      value: formatCurrency(commission),
+      subtitle: "10% trên tổng doanh thu hoàn thành",
+      icon: Coins,
+      iconClassName: "text-green-600",
+      cardClassName: "bg-gradient-to-br from-[#0f9d58] to-[#22c55e] text-white",
+    },
+  ];
+
   return (
     <section className="space-y-6 lg:space-y-8">
       <header className="flex items-center justify-between gap-4 rounded-[28px] bg-white px-5 py-5 shadow-sm ring-1 ring-black/5 lg:px-8 lg:py-6">
         <div className="space-y-2">
-          <p className="text-sm font-medium uppercase tracking-[0.24em] text-[#b4534c]">
-            Dashboard CTV
-          </p>
-          <h1 className="text-2xl font-extrabold tracking-tight text-[#3f2723] lg:text-4xl">
-            Xin chào, Nguyễn Văn A
-          </h1>
+          <p className="text-sm font-medium uppercase tracking-[0.24em] text-[#b4534c]">Dashboard CTV</p>
+          <h1 className="text-2xl font-extrabold tracking-tight text-[#3f2723] lg:text-4xl">Xin chào, CTV</h1>
           <p className="max-w-xl text-sm text-[#8d6a64] lg:text-base">
-            Chào mừng bạn quay lại. Đây là tổng quan nhanh về doanh thu, đơn hàng và hoa hồng của
-            bạn hôm nay.
+            Tổng quan realtime từ Firestore: doanh thu, số đơn thành công và hoa hồng tạm tính.
           </p>
         </div>
 
@@ -64,37 +105,41 @@ export default function CtvPage() {
         </div>
       </header>
 
+      {error ? <div className="rounded-2xl border border-[#f2d1d1] bg-[#fff7f7] px-4 py-3 text-sm font-medium text-[#b42318]">{error}</div> : null}
+
       <div className="grid gap-4 lg:grid-cols-3 lg:gap-6">
         {stats.map((item) => {
           const Icon = item.icon;
+          const isWhiteText = item.cardClassName.includes("text-white");
 
           return (
-            <article
-              key={item.title}
-              className={`rounded-[28px] p-5 shadow-sm ring-1 ring-black/5 lg:p-6 ${item.cardClassName}`}
-            >
+            <article key={item.title} className={`rounded-[28px] p-5 shadow-sm ring-1 ring-black/5 lg:p-6 ${item.cardClassName}`}>
               <div className="flex items-start justify-between gap-4">
                 <div className="space-y-3">
-                  <p className={`text-sm font-semibold uppercase tracking-[0.18em] ${item.cardClassName.includes("text-white") ? "text-white/80" : "text-[#9c6a62]"}`}>
-                    {item.title}
-                  </p>
-                  <div className={`text-3xl font-extrabold tracking-tight lg:text-4xl ${item.cardClassName.includes("text-white") ? "text-white" : "text-[#3d231f]"}`}>
-                    {item.value}
-                  </div>
-                  <p className={`text-sm ${item.cardClassName.includes("text-white") ? "text-white/80" : "text-[#8f6f68]"}`}>
-                    {item.subtitle}
-                  </p>
+                  <p className={`text-sm font-semibold uppercase tracking-[0.18em] ${isWhiteText ? "text-white/80" : "text-[#9c6a62]"}`}>{item.title}</p>
+                  <div className={`text-3xl font-extrabold tracking-tight lg:text-4xl ${isWhiteText ? "text-white" : "text-[#3d231f]"}`}>{item.value}</div>
+                  <p className={`text-sm ${isWhiteText ? "text-white/80" : "text-[#8f6f68]"}`}>{item.subtitle}</p>
                 </div>
 
-                <div
-                  className={`grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-white/10 ${item.cardClassName.includes("text-white") ? "ring-1 ring-white/20" : "bg-[#f8f0ee]"}`}
-                >
+                <div className={`grid h-14 w-14 shrink-0 place-items-center rounded-2xl ${isWhiteText ? "bg-white/10 ring-1 ring-white/20" : "bg-[#f8f0ee]"}`}>
                   <Icon className={`h-7 w-7 ${item.iconClassName}`} />
                 </div>
               </div>
             </article>
           );
         })}
+      </div>
+
+      <div className="rounded-[28px] border border-[#efe2df] bg-white p-5 shadow-sm ring-1 ring-black/5 lg:p-6">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold text-[#3f2723]">Tình trạng đơn hàng của bạn</h2>
+            <p className="mt-1 text-sm text-[#8d6a64]">Chỉ tính các đơn do CTV này tạo ra trong Firestore.</p>
+          </div>
+          <div className="rounded-full bg-[#f1fbf4] px-3 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200">
+            {completedOrders.length} đơn hoàn thành
+          </div>
+        </div>
       </div>
     </section>
   );

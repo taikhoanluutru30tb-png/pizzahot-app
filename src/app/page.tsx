@@ -233,9 +233,23 @@ export default function Page() {
 
         <div className="mt-8 text-center text-[0.9rem] text-[#8f7872]">
           <p>Gặp khó khăn khi truy cập?</p>
-          <a href="mailto:it-support@pizzahot.vn" className="mt-1 inline-block font-medium text-[#c4201d] hover:underline">
+          <a
+            href="https://zalo.me/0348726823"
+            target="_blank"
+            rel="noreferrer"
+            className="mt-1 inline-block font-medium text-[#c4201d] hover:underline"
+          >
             Liên hệ IT Support
           </a>
+          <div className="mt-2 flex items-center justify-center gap-3 text-sm">
+            <a href="tel:0348726823" className="font-medium text-[#c4201d] hover:underline">
+              0348726823
+            </a>
+            <span className="text-[#b7a19b]">•</span>
+            <a href="https://zalo.me/0348726823" target="_blank" rel="noreferrer" className="font-medium text-[#c4201d] hover:underline">
+              Zalo
+            </a>
+          </div>
         </div>
       </div>
     </main>
