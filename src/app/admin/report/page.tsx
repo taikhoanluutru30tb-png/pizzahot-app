@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { collection, onSnapshot, type Timestamp } from "firebase/firestore";
 import {
   Area,
   AreaChart,
@@ -11,197 +12,340 @@ import {
   YAxis,
 } from "recharts";
 import {
-  ArrowDownToLine,
+  Award,
   Banknote,
   CalendarDays,
   ChartSpline,
-  CircleDollarSign,
+  ClipboardList,
   Filter,
-  PiggyBank,
+  Flame,
+  ShoppingBag,
   TrendingUp,
+  Truck,
 } from "lucide-react";
+import { db } from "@/app/lib/firebase";
 
-type TimeFilter = "day" | "month" | "year";
+type ReportRange = "today" | "7days" | "month";
+
+type FirestoreOrderItem = {
+  ten_mon?: string;
+  tenMon?: string;
+  ten_san_pham?: string;
+  tenSanPham?: string;
+  name?: string;
+  quantity?: number | string;
+  so_luong?: number | string;
+  soLuong?: number | string;
+};
+
+type FirestoreOrder = {
+  id: string;
+  ma_don?: string;
+  order_code?: string;
+  customer_name?: string;
+  ten_khach_hang?: string;
+  customer?: string;
+  tong_tien?: number | string;
+  thoi_gian_tao?: Timestamp | { seconds: number; nanoseconds?: number } | Date | string;
+  trang_thai?: string;
+  status?: string;
+  shipper?: string;
+  nguoi_giao?: string;
+  danh_sach_mon?: FirestoreOrderItem[];
+};
+
+type CompletedOrderRow = {
+  id: string;
+  code: string;
+  timeLabel: string;
+  timeMs: number;
+  customer: string;
+  total: number;
+  shipper: string;
+};
+
+type TopSellingItem = {
+  name: string;
+  quantity: number;
+};
 
 type RevenuePoint = {
   label: string;
-  doanhThu: number;
+  revenue: number;
 };
 
-type MetricCard = {
-  title: string;
-  value: string;
-  change: string;
-  icon: typeof Banknote;
-  accent: string;
-};
-
-const revenueDataByFilter: Record<TimeFilter, RevenuePoint[]> = {
-  day: [
-    { label: "00h", doanhThu: 12.5 },
-    { label: "03h", doanhThu: 10.2 },
-    { label: "06h", doanhThu: 15.8 },
-    { label: "09h", doanhThu: 28.4 },
-    { label: "12h", doanhThu: 44.1 },
-    { label: "15h", doanhThu: 36.3 },
-    { label: "18h", doanhThu: 52.6 },
-    { label: "21h", doanhThu: 41.8 },
-  ],
-  month: [
-    { label: "T1", doanhThu: 280 },
-    { label: "T2", doanhThu: 320 },
-    { label: "T3", doanhThu: 295 },
-    { label: "T4", doanhThu: 360 },
-    { label: "T5", doanhThu: 410 },
-    { label: "T6", doanhThu: 455 },
-    { label: "T7", doanhThu: 480 },
-    { label: "T8", doanhThu: 430 },
-    { label: "T9", doanhThu: 515 },
-    { label: "T10", doanhThu: 490 },
-    { label: "T11", doanhThu: 560 },
-    { label: "T12", doanhThu: 620 },
-  ],
-  year: [
-    { label: "2021", doanhThu: 3650 },
-    { label: "2022", doanhThu: 4320 },
-    { label: "2023", doanhThu: 5120 },
-    { label: "2024", doanhThu: 5980 },
-    { label: "2025", doanhThu: 6840 },
-    { label: "2026", doanhThu: 7290 },
-  ],
-};
-
-const metricCards: MetricCard[] = [
-  {
-    title: "Tổng doanh thu",
-    value: "42.850.000đ",
-    change: "+12.4% so với kỳ trước",
-    icon: CircleDollarSign,
-    accent: "from-[#c62828] to-[#e45a4a]",
-  },
-  {
-    title: "Lợi nhuận",
-    value: "18.920.000đ",
-    change: "+8.1% so với kỳ trước",
-    icon: TrendingUp,
-    accent: "from-[#2e7d32] to-[#4caf50]",
-  },
-  {
-    title: "Chi phí",
-    value: "23.930.000đ",
-    change: "-3.2% so với kỳ trước",
-    icon: PiggyBank,
-    accent: "from-[#d97706] to-[#f59e0b]",
-  },
+const rangeOptions: Array<{ id: ReportRange; label: string }> = [
+  { id: "today", label: "Hôm nay" },
+  { id: "7days", label: "7 ngày qua" },
+  { id: "month", label: "Tháng này" },
 ];
 
-function formatCurrency(value: number) {
+function formatCurrency(amount: number) {
   return new Intl.NumberFormat("vi-VN", {
     style: "currency",
     currency: "VND",
     maximumFractionDigits: 0,
-  }).format(value);
+  }).format(amount);
+}
+
+function formatDateTime(value?: FirestoreOrder["thoi_gian_tao"]) {
+  const date = toDate(value);
+  if (!date) return "—";
+
+  return new Intl.DateTimeFormat("vi-VN", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(date);
+}
+
+function toDate(value?: FirestoreOrder["thoi_gian_tao"]) {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value === "string") {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  if (typeof value === "object" && "seconds" in value) {
+    return new Date(value.seconds * 1000);
+  }
+  return null;
+}
+
+function getTimestampMs(value?: FirestoreOrder["thoi_gian_tao"]) {
+  const date = toDate(value);
+  return date ? date.getTime() : 0;
+}
+
+function getOrderStatus(order: FirestoreOrder) {
+  return order.trang_thai || order.status || "Đang xử lý";
+}
+
+function getCustomerName(order: FirestoreOrder) {
+  return order.customer_name || order.ten_khach_hang || order.customer || "Khách hàng";
+}
+
+function getOrderCode(order: FirestoreOrder) {
+  return order.ma_don || order.order_code || order.id.slice(0, 8).toUpperCase();
+}
+
+function getShipperName(order: FirestoreOrder) {
+  return order.shipper || order.nguoi_giao || "—";
+}
+
+function getItemName(item: FirestoreOrderItem) {
+  return item.ten_mon || item.tenMon || item.ten_san_pham || item.tenSanPham || item.name || "Món ăn";
+}
+
+function getItemQuantity(item: FirestoreOrderItem) {
+  const quantity = item.quantity ?? item.so_luong ?? item.soLuong ?? 0;
+  return Number(quantity) || 0;
+}
+
+function isSameDay(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+function isWithinLastDays(date: Date, days: number) {
+  const now = new Date();
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - (days - 1));
+  const end = new Date(now);
+  end.setHours(23, 59, 59, 999);
+  return date >= start && date <= end;
+}
+
+function isWithinCurrentMonth(date: Date) {
+  const now = new Date();
+  return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
 }
 
 export default function AdminReportPage() {
-  const [filter, setFilter] = useState<TimeFilter>("day");
-  const revenueData = useMemo(() => revenueDataByFilter[filter], [filter]);
+  const [range, setRange] = useState<ReportRange>("today");
+  const [loading, setLoading] = useState(true);
+  const [orders, setOrders] = useState<FirestoreOrder[]>([]);
 
-  const summary = useMemo(() => {
-    const totalRevenue = revenueData.reduce((sum, item) => sum + item.doanhThu, 0);
-    const cost = totalRevenue * 0.56;
-    const profit = totalRevenue - cost;
+  useEffect(() => {
+    if (!db) return;
+
+    const unsubscribe = onSnapshot(collection(db, "orders"), (snapshot) => {
+      const nextOrders = snapshot.docs.map((doc) => ({ id: doc.id, ...(doc.data() as Omit<FirestoreOrder, "id">) }));
+      setOrders(nextOrders);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const report = useMemo(() => {
+    const now = new Date();
+    const completedOrders = orders.filter((order) => getOrderStatus(order) === "Hoàn thành");
+    const canceledOrders = orders.filter((order) => getOrderStatus(order) === "Đã hủy");
+
+    const totalRevenue = completedOrders.reduce((sum, order) => sum + Number(order.tong_tien || 0), 0);
+
+    const todayRevenue = completedOrders
+      .filter((order) => {
+        const date = toDate(order.thoi_gian_tao);
+        return date ? isSameDay(date, now) : false;
+      })
+      .reduce((sum, order) => sum + Number(order.tong_tien || 0), 0);
+
+    const successfulCount = completedOrders.length;
+    const failedCount = canceledOrders.length;
+    const successRate = orders.length ? (successfulCount / orders.length) * 100 : 0;
+
+    const filteredCompletedOrders = completedOrders.filter((order) => {
+      const date = toDate(order.thoi_gian_tao);
+      if (!date) return false;
+      if (range === "today") return isSameDay(date, now);
+      if (range === "7days") return isWithinLastDays(date, 7);
+      return isWithinCurrentMonth(date);
+    });
+
+    const recentOrders: CompletedOrderRow[] = filteredCompletedOrders
+      .map((order) => {
+        const date = toDate(order.thoi_gian_tao);
+        return {
+          id: order.id,
+          code: getOrderCode(order),
+          timeLabel: formatDateTime(order.thoi_gian_tao),
+          timeMs: date?.getTime() || 0,
+          customer: getCustomerName(order),
+          total: Number(order.tong_tien || 0),
+          shipper: getShipperName(order),
+        };
+      })
+      .sort((a, b) => b.timeMs - a.timeMs)
+      .slice(0, 10);
+
+    const itemTotals = new Map<string, number>();
+    completedOrders.forEach((order) => {
+      (order.danh_sach_mon || []).forEach((item) => {
+        const name = getItemName(item).trim();
+        const quantity = getItemQuantity(item);
+        if (!name || !quantity) return;
+        itemTotals.set(name, (itemTotals.get(name) || 0) + quantity);
+      });
+    });
+
+    const topSelling: TopSellingItem[] = Array.from(itemTotals.entries())
+      .map(([name, quantity]) => ({ name, quantity }))
+      .sort((a, b) => b.quantity - a.quantity)
+      .slice(0, 5);
+
+    const revenueByDayMap = new Map<string, number>();
+    filteredCompletedOrders.forEach((order) => {
+      const date = toDate(order.thoi_gian_tao);
+      if (!date) return;
+      const label = new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit" }).format(date);
+      revenueByDayMap.set(label, (revenueByDayMap.get(label) || 0) + Number(order.tong_tien || 0));
+    });
+
+    const revenueChartData: RevenuePoint[] = Array.from(revenueByDayMap.entries())
+      .map(([label, revenue]) => ({ label, revenue }))
+      .sort((a, b) => {
+        const [ad, am] = a.label.split("/").map(Number);
+        const [bd, bm] = b.label.split("/").map(Number);
+        return am === bm ? ad - bd : am - bm;
+      });
 
     return {
       totalRevenue,
-      profit,
-      cost,
+      todayRevenue,
+      successfulCount,
+      failedCount,
+      successRate,
+      recentOrders,
+      topSelling,
+      revenueChartData,
     };
-  }, [revenueData]);
+  }, [orders, range]);
+
+  const bestSeller = report.topSelling[0];
 
   return (
-    <main className="space-y-5 pb-4 text-[#4b342f] sm:space-y-6 lg:space-y-8">
-      <section className="rounded-[28px] border border-[#efdfdc] bg-white p-4 shadow-[0_12px_40px_rgba(97,39,25,0.06)] sm:p-5 lg:p-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#b28b84]">Báo cáo tổng hợp</p>
-            <h1 className="mt-2 text-[clamp(1.65rem,4vw,2.4rem)] font-black tracking-tight text-[#241614]">Report Dashboard</h1>
-            <p className="mt-2 max-w-2xl text-sm text-[#9b7d78] lg:text-base">Thống kê doanh thu, lợi nhuận và chi phí theo thời gian, tối ưu cho cả desktop và mobile.</p>
+    <main className="space-y-6 pb-6 text-[#4b342f] lg:space-y-8">
+      <section className="overflow-hidden rounded-[30px] border border-[#efdfdc] bg-gradient-to-br from-[#fff8f5] via-white to-[#f7eeeb] p-5 shadow-[0_16px_40px_rgba(97,39,25,0.06)] lg:p-7">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-3xl">
+            <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#b28b84]">Báo cáo chuyên sâu</p>
+            <h1 className="mt-2 text-[clamp(2rem,4vw,3.2rem)] font-black tracking-tight text-[#241614]">
+              Dashboard báo cáo Firestore
+            </h1>
+            <p className="mt-3 text-sm leading-7 text-[#9b7d78] lg:text-base">
+              Dữ liệu đồng bộ realtime từ collection <span className="font-semibold text-[#7f625e]">orders</span>, bao gồm doanh thu, tỷ lệ thành công, món bán chạy và bảng đơn hoàn thành gần đây.
+            </p>
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row lg:items-end">
-            <label className="block">
-              <span className="mb-2 block text-[11px] font-extrabold uppercase tracking-[0.18em] text-[#8d6e68]">Bộ lọc thời gian</span>
-              <div className="grid grid-cols-3 rounded-2xl bg-[#f7f1ef] p-1 ring-1 ring-[#ead9d4]">
-                {[
-                  { id: "day", label: "Ngày" },
-                  { id: "month", label: "Tháng" },
-                  { id: "year", label: "Năm" },
-                ].map((item) => {
-                  const active = filter === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => setFilter(item.id as TimeFilter)}
-                      className={`rounded-xl px-4 py-2.5 text-sm font-bold transition ${active ? "bg-[#c62828] text-white shadow-[0_8px_18px_rgba(198,40,40,0.25)]" : "text-[#7f625e] hover:bg-white/80"}`}
-                    >
-                      {item.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </label>
-
-            <label className="block min-w-0 sm:min-w-[280px]">
-              <span className="mb-2 block text-[11px] font-extrabold uppercase tracking-[0.18em] text-[#8d6e68]">Khoảng thời gian</span>
-              <div className="flex items-center gap-3 rounded-2xl border border-[#e6d8d4] bg-[#fcfaf9] px-4 py-3 shadow-sm">
-                <CalendarDays className="h-5 w-5 shrink-0 text-[#b07c74]" />
-                <input
-                  type="text"
-                  readOnly
-                  value={filter === "day" ? "01/10/2023 - 31/10/2023" : filter === "month" ? "01/01/2026 - 31/12/2026" : "01/01/2021 - 31/12/2026"}
-                  className="w-full bg-transparent text-sm font-medium text-[#4d3b37] outline-none"
-                />
-              </div>
-            </label>
-
-            <button className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#c62828] px-5 py-3.5 font-bold text-white shadow-[0_12px_24px_rgba(198,40,40,0.22)] transition hover:bg-[#a91f1f]">
-              <ArrowDownToLine className="h-4 w-4" />
-              Xuất báo cáo (Excel)
-            </button>
+          <div className="flex flex-wrap gap-3">
+            {rangeOptions.map((item) => {
+              const active = range === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setRange(item.id)}
+                  className={`inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold transition ${active ? "bg-[#c62828] text-white shadow-[0_12px_24px_rgba(198,40,40,0.22)]" : "bg-white text-[#7f625e] ring-1 ring-[#ead9d4] hover:bg-[#fff8f6]"}`}
+                >
+                  <Filter className="h-4 w-4" />
+                  {item.label}
+                </button>
+              );
+            })}
           </div>
         </div>
       </section>
 
       <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        {metricCards.map((card) => {
-          const Icon = card.icon;
-          const displayedValue =
-            card.title === "Tổng doanh thu"
-              ? formatCurrency(summary.totalRevenue * 1000000)
-              : card.title === "Lợi nhuận"
-                ? formatCurrency(summary.profit * 1000000)
-                : formatCurrency(summary.cost * 1000000);
-
-          return (
-            <article key={card.title} className="overflow-hidden rounded-[24px] border border-[#efe1dc] bg-white shadow-[0_10px_28px_rgba(97,39,25,0.05)]">
-              <div className={`h-1.5 bg-gradient-to-r ${card.accent}`} />
-              <div className="p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[#a78b85]">{card.title}</p>
-                    <div className="mt-3 text-[1.7rem] font-black tracking-tight text-[#2c1b17] lg:text-[2rem]">{displayedValue}</div>
-                    <p className="mt-2 text-sm text-[#9d7f79]">{card.change}</p>
-                  </div>
-                  <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#f8f2f1] text-[#c62828]">
-                    <Icon className="h-5 w-5" />
-                  </div>
-                </div>
+        <article className="rounded-[26px] border border-[#efe1dc] bg-white p-5 shadow-[0_10px_28px_rgba(97,39,25,0.05)]">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-extrabold uppercase tracking-[0.2em] text-[#a78b85]">Tổng doanh thu</p>
+              <div className="mt-3 text-[1.9rem] font-black tracking-tight text-[#2c1b17] lg:text-[2.25rem]">
+                {loading ? "—" : formatCurrency(report.totalRevenue)}
               </div>
-            </article>
-          );
-        })}
+              <p className="mt-2 text-sm text-[#9d7f79]">Tất cả đơn hàng hoàn thành</p>
+            </div>
+            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#fff0ef] text-[#c62828]">
+              <Banknote className="h-5 w-5" />
+            </div>
+          </div>
+        </article>
+
+        <article className="rounded-[26px] border border-[#efe1dc] bg-white p-5 shadow-[0_10px_28px_rgba(97,39,25,0.05)]">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-extrabold uppercase tracking-[0.2em] text-[#a78b85]">Đơn hoàn thành</p>
+              <div className="mt-3 text-[1.9rem] font-black tracking-tight text-[#2c1b17] lg:text-[2.25rem]">
+                {loading ? "—" : report.successfulCount}
+              </div>
+              <p className="mt-2 text-sm text-[#9d7f79]">
+                Đã hủy: {report.failedCount} · Tỷ lệ thành công: {report.successRate.toFixed(1)}%
+              </p>
+            </div>
+            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#eefaf1] text-[#2e7d32]">
+              <Award className="h-5 w-5" />
+            </div>
+          </div>
+        </article>
+
+        <article className="rounded-[26px] border border-[#efe1dc] bg-white p-5 shadow-[0_10px_28px_rgba(97,39,25,0.05)]">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-extrabold uppercase tracking-[0.2em] text-[#a78b85]">Món bán chạy nhất</p>
+              <div className="mt-3 text-[1.3rem] font-black tracking-tight text-[#2c1b17] lg:text-[1.55rem]">
+                {bestSeller ? bestSeller.name : "—"}
+              </div>
+              <p className="mt-2 text-sm text-[#9d7f79]">
+                {bestSeller ? `${bestSeller.quantity} phần đã bán` : "Chưa có dữ liệu"}
+              </p>
+            </div>
+            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#fff7ea] text-[#d97706]">
+              <Flame className="h-5 w-5" />
+            </div>
+          </div>
+        </article>
       </section>
 
       <section className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.9fr)]">
@@ -212,28 +356,28 @@ export default function AdminReportPage() {
                 <ChartSpline className="h-5 w-5" />
                 <span className="text-sm font-bold uppercase tracking-[0.2em]">Biểu đồ doanh thu</span>
               </div>
-              <h2 className="mt-2 text-[1.15rem] font-extrabold text-[#251714] sm:text-[1.3rem]">Đường biểu diễn doanh thu</h2>
-              <p className="mt-1 text-sm text-[#9d7f79]">Dữ liệu hardcode theo bộ lọc thời gian hiện tại.</p>
+              <h2 className="mt-2 text-[1.15rem] font-extrabold text-[#251714] sm:text-[1.3rem]">Doanh thu theo ngày</h2>
+              <p className="mt-1 text-sm text-[#9d7f79]">Tự động ánh xạ dữ liệu theo khoảng thời gian đã chọn.</p>
             </div>
 
             <div className="inline-flex items-center gap-2 rounded-full bg-[#fff4f2] px-3 py-2 text-sm font-semibold text-[#c62828]">
-              <Filter className="h-4 w-4" />
-              {filter === "day" ? "Theo ngày" : filter === "month" ? "Theo tháng" : "Theo năm"}
+              <TrendingUp className="h-4 w-4" />
+              Realtime
             </div>
           </div>
 
           <div className="h-[300px] sm:h-[360px] lg:h-[420px]">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={revenueData} margin={{ top: 10, right: 8, left: -12, bottom: 0 }}>
+              <AreaChart data={report.revenueChartData} margin={{ top: 10, right: 8, left: -12, bottom: 0 }}>
                 <defs>
-                  <linearGradient id="revenueFill" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient id="reportRevenueFill" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#c62828" stopOpacity={0.28} />
                     <stop offset="95%" stopColor="#c62828" stopOpacity={0.02} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="4 4" stroke="#f1e3df" vertical={false} />
                 <XAxis dataKey="label" tick={{ fill: "#9d7f79", fontSize: 12, fontWeight: 600 }} axisLine={false} tickLine={false} />
-                <YAxis tickFormatter={(value) => `${value}`} tick={{ fill: "#9d7f79", fontSize: 12, fontWeight: 600 }} axisLine={false} tickLine={false} width={36} />
+                <YAxis tickFormatter={(value) => `${Number(value).toLocaleString("vi-VN")}`} tick={{ fill: "#9d7f79", fontSize: 12, fontWeight: 600 }} axisLine={false} tickLine={false} width={50} />
                 <Tooltip
                   contentStyle={{
                     borderRadius: 16,
@@ -242,17 +386,14 @@ export default function AdminReportPage() {
                     boxShadow: "0 18px 40px rgba(97,39,25,0.12)",
                   }}
                   labelStyle={{ color: "#4b342f", fontWeight: 700 }}
-                  formatter={(value) => {
-                    const numericValue = typeof value === "number" ? value : Number(value ?? 0);
-                    return [formatCurrency(numericValue * 1000000), "Doanh thu"];
-                  }}
+                  formatter={(value) => [formatCurrency(Number(value || 0)), "Doanh thu"]}
                 />
                 <Area
                   type="monotone"
-                  dataKey="doanhThu"
+                  dataKey="revenue"
                   stroke="#c62828"
                   strokeWidth={3}
-                  fill="url(#revenueFill)"
+                  fill="url(#reportRevenueFill)"
                   dot={{ r: 4, strokeWidth: 2, fill: "#fff", stroke: "#c62828" }}
                   activeDot={{ r: 6, strokeWidth: 0, fill: "#c62828" }}
                 />
@@ -265,35 +406,126 @@ export default function AdminReportPage() {
           <div className="rounded-[28px] border border-[#efdfdc] bg-white p-4 shadow-[0_12px_40px_rgba(97,39,25,0.06)] sm:p-5 lg:p-6">
             <div className="flex items-center gap-3">
               <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#fff0ef] text-[#c62828]">
-                <Banknote className="h-5 w-5" />
+                <ClipboardList className="h-5 w-5" />
               </div>
               <div>
                 <h3 className="text-lg font-extrabold text-[#251714]">Tổng kết nhanh</h3>
-                <p className="text-sm text-[#9d7f79]">Tổng hợp theo bộ lọc hiện tại</p>
+                <p className="text-sm text-[#9d7f79]">Theo bộ lọc đang chọn</p>
               </div>
             </div>
 
             <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-1">
               <div className="rounded-2xl bg-[#fcf8f7] p-4">
-                <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#a78b85]">Doanh thu trung bình</p>
-                <div className="mt-2 text-2xl font-black text-[#c62828]">{formatCurrency((summary.totalRevenue / revenueData.length) * 1000000)}</div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#a78b85]">Doanh thu hôm nay</p>
+                <div className="mt-2 text-2xl font-black text-[#c62828]">
+                  {loading ? "—" : formatCurrency(report.todayRevenue)}
+                </div>
               </div>
               <div className="rounded-2xl bg-[#fcf8f7] p-4">
-                <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#a78b85]">Biên lợi nhuận</p>
-                <div className="mt-2 text-2xl font-black text-[#2e7d32]">44.0%</div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#a78b85]">Tỷ lệ thành công</p>
+                <div className="mt-2 text-2xl font-black text-[#2e7d32]">
+                  {loading ? "—" : `${report.successRate.toFixed(1)}%`}
+                </div>
               </div>
             </div>
           </div>
 
           <div className="rounded-[28px] border border-[#efdfdc] bg-white p-4 shadow-[0_12px_40px_rgba(97,39,25,0.06)] sm:p-5 lg:p-6">
-            <h3 className="text-lg font-extrabold text-[#251714]">Ghi chú</h3>
-            <ul className="mt-4 space-y-3 text-sm text-[#8f746f]">
-              <li className="rounded-2xl bg-[#fcf8f7] p-3">• Dữ liệu đang dùng hardcode để kiểm thử giao diện và biểu đồ.</li>
-              <li className="rounded-2xl bg-[#fcf8f7] p-3">• Có thể thay source dữ liệu bằng API hoặc Firestore sau này.</li>
-              <li className="rounded-2xl bg-[#fcf8f7] p-3">• Bố cục tự động xếp dọc trên mobile và chia cột trên desktop.</li>
-            </ul>
+            <div className="flex items-center gap-3">
+              <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#eefaf1] text-[#2e7d32]">
+                <ShoppingBag className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-lg font-extrabold text-[#251714]">Top selling</h3>
+                <p className="text-sm text-[#9d7f79]">3-5 món được đặt nhiều nhất</p>
+              </div>
+            </div>
+
+            <div className="mt-5 space-y-3">
+              {report.topSelling.length ? (
+                report.topSelling.map((item, index) => (
+                  <div key={item.name} className="flex items-center justify-between rounded-2xl bg-[#fcf8f7] p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="grid h-9 w-9 place-items-center rounded-xl bg-white text-[#c62828] ring-1 ring-[#efdeda]">
+                        #{index + 1}
+                      </div>
+                      <div>
+                        <p className="font-bold text-[#2c1b17]">{item.name}</p>
+                        <p className="text-sm text-[#9d7f79]">Số lượng đã bán</p>
+                      </div>
+                    </div>
+                    <div className="text-lg font-black text-[#c62828]">{item.quantity}</div>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-2xl bg-[#fcf8f7] p-4 text-sm text-[#8f746f]">Chưa có dữ liệu món ăn từ các đơn hoàn thành.</div>
+              )}
+            </div>
           </div>
         </aside>
+      </section>
+
+      <section className="rounded-[28px] border border-[#efdfdc] bg-white p-4 shadow-[0_12px_40px_rgba(97,39,25,0.06)] sm:p-5 lg:p-6">
+        <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2 text-[#c62828]">
+              <Truck className="h-5 w-5" />
+              <span className="text-sm font-bold uppercase tracking-[0.2em]">Đơn hàng hoàn thành gần đây</span>
+            </div>
+            <h2 className="mt-2 text-[1.15rem] font-extrabold text-[#251714] sm:text-[1.3rem]">Danh sách chi tiết</h2>
+            <p className="mt-1 text-sm text-[#9d7f79]">Hiển thị các đơn hoàn thành trong khoảng thời gian đã chọn.</p>
+          </div>
+          <div className="inline-flex items-center gap-2 rounded-full bg-[#fff4f2] px-3 py-2 text-sm font-semibold text-[#c62828]">
+            <CalendarDays className="h-4 w-4" />
+            {rangeOptions.find((item) => item.id === range)?.label}
+          </div>
+        </div>
+
+        <div className="overflow-hidden rounded-[22px] border border-[#f1e5e1]">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-[#f1e5e1]">
+              <thead className="bg-[#fff8f6] text-left text-xs font-extrabold uppercase tracking-[0.16em] text-[#a78b85]">
+                <tr>
+                  <th className="px-4 py-4">Mã đơn</th>
+                  <th className="px-4 py-4">Thời gian</th>
+                  <th className="px-4 py-4">Khách hàng</th>
+                  <th className="px-4 py-4 text-right">Tổng tiền</th>
+                  <th className="px-4 py-4">Người giao</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#f5ece9] bg-white">
+                {loading ? (
+                  Array.from({ length: 5 }).map((_, index) => (
+                    <tr key={index}>
+                      <td className="px-4 py-4" colSpan={5}>
+                        <div className="h-12 animate-pulse rounded-2xl bg-[#f7f1ef]" />
+                      </td>
+                    </tr>
+                  ))
+                ) : report.recentOrders.length ? (
+                  report.recentOrders.map((order) => (
+                    <tr key={order.id} className="transition hover:bg-[#fffaf9]">
+                      <td className="px-4 py-4">
+                        <div className="font-bold text-[#2c1b17]">{order.code}</div>
+                        <div className="text-xs text-[#9d7f79]">ID: {order.id.slice(0, 8)}</div>
+                      </td>
+                      <td className="px-4 py-4 text-sm text-[#6f5854]">{order.timeLabel}</td>
+                      <td className="px-4 py-4 font-medium text-[#4b342f]">{order.customer}</td>
+                      <td className="px-4 py-4 text-right font-black text-[#c62828]">{formatCurrency(order.total)}</td>
+                      <td className="px-4 py-4 text-sm text-[#6f5854]">{order.shipper}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td className="px-4 py-8 text-center text-sm text-[#8f746f]" colSpan={5}>
+                      Không có đơn hoàn thành nào trong khoảng thời gian đã chọn.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </section>
     </main>
   );

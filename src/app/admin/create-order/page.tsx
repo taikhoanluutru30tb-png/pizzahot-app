@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   Building2,
@@ -17,14 +17,28 @@ import {
   User2,
   X,
 } from "lucide-react";
+import { addDoc, collection, onSnapshot, serverTimestamp } from "firebase/firestore";
+import { auth, db } from "@/app/lib/firebase";
+
+type MenuItem = {
+  id: string;
+  ten_mon?: string;
+  ten?: string;
+  gia_tien?: number;
+  gia?: number;
+  image?: string;
+  hinh_anh?: string;
+  danh_muc?: string;
+  mo_ta?: string;
+};
 
 type Product = {
   id: string;
   name: string;
-  category: string;
-  description: string;
   price: number;
-  image: string;
+  image?: string;
+  category?: string;
+  description?: string;
 };
 
 type CartItem = Product & { quantity: number };
@@ -39,57 +53,6 @@ type CustomerForm = {
 const categories = ["Tất cả", "Pizza", "Đồ uống", "Món phụ"] as const;
 const assignTargets = ["Không gán", "Shipper #01", "Shipper #02", "Chi nhánh Quận 1", "Chi nhánh Quận 7"] as const;
 
-const products: Product[] = [
-  {
-    id: "pizza-hai-san",
-    name: "Pizza Hải Sản",
-    category: "Pizza",
-    description: "Tôm, mực, thanh cua và sốt phô mai béo ngậy.",
-    price: 189000,
-    image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=900&q=80",
-  },
-  {
-    id: "pizza-bo-nuong",
-    name: "Pizza Bò Nướng BBQ",
-    category: "Pizza",
-    description: "Bò nướng mềm, sốt BBQ đậm vị, viền bánh giòn rụm.",
-    price: 179000,
-    image: "https://images.unsplash.com/photo-1593560708920-61dd98c46a4e?auto=format&fit=crop&w=900&q=80",
-  },
-  {
-    id: "pizza-pho-mai",
-    name: "Pizza 5 Loại Phô Mai",
-    category: "Pizza",
-    description: "Mozzarella, cheddar, parmesan và phô mai xanh.",
-    price: 155000,
-    image: "https://images.unsplash.com/photo-1548365328-9f547fb09533?auto=format&fit=crop&w=900&q=80",
-  },
-  {
-    id: "coca-cola",
-    name: "Coca Cola 1.5L",
-    category: "Đồ uống",
-    description: "Thức uống mát lạnh, phù hợp cho bữa ăn gia đình.",
-    price: 25000,
-    image: "https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&w=900&q=80",
-  },
-  {
-    id: "khoai-tay",
-    name: "Khoai Tây Chiên",
-    category: "Món phụ",
-    description: "Khoai giòn vàng, ăn kèm tương cà hoặc sốt phô mai.",
-    price: 39000,
-    image: "https://images.unsplash.com/photo-1630383249896-424e482df921?auto=format&fit=crop&w=900&q=80",
-  },
-  {
-    id: "tra-chanh",
-    name: "Trà Chanh",
-    category: "Đồ uống",
-    description: "Chua ngọt mát lạnh, rất hợp với pizza nóng hổi.",
-    price: 29000,
-    image: "https://images.unsplash.com/photo-1556679343-c7306c1976bc?auto=format&fit=crop&w=900&q=80",
-  },
-];
-
 const currencyFormatter = new Intl.NumberFormat("vi-VN", {
   style: "currency",
   currency: "VND",
@@ -100,6 +63,17 @@ function formatCurrency(value: number) {
   return currencyFormatter.format(value);
 }
 
+function normalizeMenuItem(docItem: MenuItem): Product {
+  return {
+    id: docItem.id,
+    name: docItem.ten_mon || docItem.ten || "Chưa đặt tên",
+    price: Number(docItem.gia_tien ?? docItem.gia ?? 0),
+    image: docItem.image || docItem.hinh_anh || undefined,
+    category: docItem.danh_muc || "Khác",
+    description: docItem.mo_ta || "",
+  };
+}
+
 export default function AdminCreateOrderPage() {
   const [activeCategory, setActiveCategory] = useState<(typeof categories)[number]>("Tất cả");
   const [search, setSearch] = useState("");
@@ -107,23 +81,39 @@ export default function AdminCreateOrderPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [customer, setCustomer] = useState<CustomerForm>({ name: "", phone: "", address: "", note: "" });
   const [assignTo, setAssignTo] = useState<(typeof assignTargets)[number]>("Không gán");
+  const [menu, setMenu] = useState<Product[]>([]);
+  const [loadingMenu, setLoadingMenu] = useState(true);
+  const [toast, setToast] = useState<string>("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "menu"), (snapshot) => {
+      const items = snapshot.docs.map((docItem) => normalizeMenuItem({ id: docItem.id, ...(docItem.data() as Omit<MenuItem, "id">) }));
+      setMenu(items);
+      setLoadingMenu(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(""), 3000);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
 
   const visibleProducts = useMemo(() => {
     const keyword = search.trim().toLowerCase();
-    return products.filter((product) => {
+    return menu.filter((product) => {
       const matchesCategory = activeCategory === "Tất cả" || product.category === activeCategory;
       const matchesSearch =
-        keyword.length === 0 ||
-        [product.name, product.description, product.category].some((value) =>
-          value.toLowerCase().includes(keyword),
-        );
+        keyword.length === 0 || [product.name, product.description || "", product.category || ""].some((value) => value.toLowerCase().includes(keyword));
       return matchesCategory && matchesSearch;
     });
-  }, [activeCategory, search]);
+  }, [activeCategory, menu, search]);
 
   const subtotal = useMemo(() => cart.reduce((sum, item) => sum + item.price * item.quantity, 0), [cart]);
-  const shipping = subtotal === 0 || subtotal >= 300000 ? 0 : 20000;
-  const total = subtotal + shipping;
+  const total = subtotal;
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   const addToCart = (product: Product) => {
@@ -143,12 +133,62 @@ export default function AdminCreateOrderPage() {
   };
 
   const removeItem = (id: string) => setCart((current) => current.filter((item) => item.id !== id));
-  const updateCustomer = (field: keyof CustomerForm, value: string) => {
-    setCustomer((current) => ({ ...current, [field]: value }));
+  const updateCustomer = (field: keyof CustomerForm, value: string) => setCustomer((current) => ({ ...current, [field]: value }));
+
+  const resetForm = () => {
+    setCart([]);
+    setCustomer({ name: "", phone: "", address: "", note: "" });
+    setAssignTo("Không gán");
+  };
+
+  const handleCreateOrder = async () => {
+    if (cart.length === 0 || isSubmitting) return;
+    if (!customer.name.trim() || !customer.phone.trim()) {
+      setToast("Vui lòng nhập Tên khách hàng và Số điện thoại.");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      await addDoc(collection(db, "orders"), {
+        khach_hang: {
+          ten: customer.name.trim(),
+          sdt: customer.phone.trim(),
+          dia_chi: customer.address.trim(),
+          ghi_chu: customer.note.trim(),
+        },
+        danh_sach_mon: cart.map((item) => ({
+          id: item.id,
+          ten_mon: item.name,
+          gia_tien: item.price,
+          so_luong: item.quantity,
+          thanh_tien: item.price * item.quantity,
+        })),
+        tong_tien: total,
+        trang_thai: "Chờ xử lý",
+        nguoi_tao: auth.currentUser?.uid || "Admin",
+        thoi_gian_tao: serverTimestamp(),
+      });
+
+      window.alert("Tạo đơn hàng thành công!");
+      setToast("Tạo đơn hàng thành công!");
+      resetForm();
+    } catch (error) {
+      console.error("Create order failed:", error);
+      setToast("Không thể tạo đơn hàng. Vui lòng thử lại.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-[#faf6f4] pb-28 text-[#2b1715]">
+      {toast ? (
+        <div className="fixed right-4 top-4 z-50 rounded-2xl bg-[#2b1715] px-4 py-3 text-sm font-medium text-white shadow-xl">
+          {toast}
+        </div>
+      ) : null}
+
       <div className="mx-auto max-w-7xl space-y-6 px-4 py-4 sm:px-6 lg:px-8 lg:py-6">
         <header className="rounded-[28px] bg-white p-5 shadow-[0_10px_30px_rgba(17,24,39,0.05)] ring-1 ring-black/5 lg:p-6">
           <div className="flex items-start justify-between gap-4">
@@ -159,7 +199,7 @@ export default function AdminCreateOrderPage() {
               </div>
               <h1 className="text-2xl font-extrabold tracking-tight lg:text-4xl">Tạo đơn hàng</h1>
               <p className="max-w-2xl text-sm text-[#8b6d67] lg:text-base">
-                Giao diện bán hàng dành cho Admin: chọn món, quản lý giỏ hàng, nhập khách hàng và gán đơn cho shipper hoặc chi nhánh.
+                Chọn món từ Firestore, quản lý giỏ hàng và tạo đơn hàng trực tiếp lên Firebase.
               </p>
             </div>
 
@@ -179,7 +219,7 @@ export default function AdminCreateOrderPage() {
               <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="text-xl font-bold">Danh sách thực đơn</h2>
-                  <p className="mt-1 text-sm text-[#8b6d67]">Bố cục desktop 2 cột, mobile xếp dọc để thao tác nhanh.</p>
+                  <p className="mt-1 text-sm text-[#8b6d67]">Dữ liệu được lấy realtime từ collection `menu`.</p>
                 </div>
                 <div className="inline-flex items-center gap-2 rounded-full bg-[#fff7f5] px-3 py-2 text-xs font-medium text-[#8b6d67]">
                   <ShoppingBag className="h-4 w-4 text-[#c62828]" />
@@ -193,7 +233,7 @@ export default function AdminCreateOrderPage() {
                   <input
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Tìm món, ví dụ: Pizza Hải Sản"
+                    placeholder="Tìm món"
                     className="w-full bg-transparent outline-none placeholder:text-[#b99f99]"
                   />
                 </label>
@@ -223,46 +263,56 @@ export default function AdminCreateOrderPage() {
                 })}
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
-                {visibleProducts.map((product) => (
-                  <article
-                    key={product.id}
-                    className="group overflow-hidden rounded-[24px] bg-[#fffaf9] ring-1 ring-[#f2e7e4] transition hover:-translate-y-0.5 hover:shadow-[0_16px_36px_rgba(17,24,39,0.08)]"
-                  >
-                    <div className="relative h-44 overflow-hidden">
-                      <Image
-                        src={product.image}
-                        alt={product.name}
-                        fill
-                        className="object-cover transition duration-500 group-hover:scale-105"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
-                      <span className="absolute left-4 top-4 rounded-full bg-black/65 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
-                        {product.category}
-                      </span>
-                    </div>
-
-                    <div className="space-y-3 p-4">
-                      <div>
-                        <h3 className="text-lg font-bold">{product.name}</h3>
-                        <p className="mt-1 text-sm leading-6 text-[#8b6d67]">{product.description}</p>
+              {loadingMenu ? (
+                <div className="rounded-3xl border border-dashed border-[#ead7d3] bg-[#fffaf9] px-4 py-10 text-center text-sm text-[#9d807a]">
+                  Đang tải thực đơn...
+                </div>
+              ) : visibleProducts.length === 0 ? (
+                <div className="rounded-3xl border border-dashed border-[#ead7d3] bg-[#fffaf9] px-4 py-10 text-center text-sm text-[#9d807a]">
+                  Chưa có món nào phù hợp.
+                </div>
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
+                  {visibleProducts.map((product) => (
+                    <article
+                      key={product.id}
+                      className="group overflow-hidden rounded-[24px] bg-[#fffaf9] ring-1 ring-[#f2e7e4] transition hover:-translate-y-0.5 hover:shadow-[0_16px_36px_rgba(17,24,39,0.08)]"
+                    >
+                      <div className="relative h-44 overflow-hidden">
+                        {product.image ? (
+                          <Image src={product.image} alt={product.name} fill className="object-cover transition duration-500 group-hover:scale-105" />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#fff1f0] to-[#ffe9e5] text-4xl font-black text-[#c62828]">
+                            {product.name.slice(0, 1).toUpperCase()}
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
+                        <span className="absolute left-4 top-4 rounded-full bg-black/65 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
+                          {product.category || "Khác"}
+                        </span>
                       </div>
 
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="text-lg font-black text-[#c62828]">{formatCurrency(product.price)}</div>
-                        <button
-                          type="button"
-                          onClick={() => addToCart(product)}
-                          className="inline-flex items-center gap-2 rounded-2xl bg-[#c62828] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#c62828]/20 transition hover:bg-[#a61f1f]"
-                        >
-                          <Plus className="h-4 w-4" />
-                          Thêm món
-                        </button>
+                      <div className="space-y-3 p-4">
+                        <div>
+                          <h3 className="text-lg font-bold">{product.name}</h3>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="text-lg font-black text-[#c62828]">{formatCurrency(product.price)}</div>
+                          <button
+                            type="button"
+                            onClick={() => addToCart(product)}
+                            className="inline-flex items-center gap-2 rounded-2xl bg-[#c62828] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#c62828]/20 transition hover:bg-[#a61f1f]"
+                          >
+                            <Plus className="h-4 w-4" />
+                            Thêm vào giỏ
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  </article>
-                ))}
-              </div>
+                    </article>
+                  ))}
+                </div>
+              )}
             </section>
           </main>
 
@@ -276,41 +326,19 @@ export default function AdminCreateOrderPage() {
               <div className="grid gap-3">
                 <label className="grid gap-2 text-sm font-medium text-[#694f49]">
                   Tên khách hàng
-                  <input
-                    value={customer.name}
-                    onChange={(event) => updateCustomer("name", event.target.value)}
-                    placeholder="Nhập tên khách hàng"
-                    className="h-12 rounded-2xl border border-[#eadedb] bg-[#fffaf9] px-4 text-sm outline-none transition placeholder:text-[#b99f99] focus:border-[#c62828]"
-                  />
+                  <input value={customer.name} onChange={(event) => updateCustomer("name", event.target.value)} placeholder="Nhập tên khách hàng" className="h-12 rounded-2xl border border-[#eadedb] bg-[#fffaf9] px-4 text-sm outline-none transition placeholder:text-[#b99f99] focus:border-[#c62828]" />
                 </label>
                 <label className="grid gap-2 text-sm font-medium text-[#694f49]">
                   Số điện thoại
-                  <input
-                    value={customer.phone}
-                    onChange={(event) => updateCustomer("phone", event.target.value)}
-                    placeholder="Nhập số điện thoại"
-                    className="h-12 rounded-2xl border border-[#eadedb] bg-[#fffaf9] px-4 text-sm outline-none transition placeholder:text-[#b99f99] focus:border-[#c62828]"
-                  />
+                  <input value={customer.phone} onChange={(event) => updateCustomer("phone", event.target.value)} placeholder="Nhập số điện thoại" className="h-12 rounded-2xl border border-[#eadedb] bg-[#fffaf9] px-4 text-sm outline-none transition placeholder:text-[#b99f99] focus:border-[#c62828]" />
                 </label>
                 <label className="grid gap-2 text-sm font-medium text-[#694f49]">
                   Địa chỉ giao hàng
-                  <textarea
-                    value={customer.address}
-                    onChange={(event) => updateCustomer("address", event.target.value)}
-                    placeholder="Số nhà, đường, phường/xã, quận/huyện..."
-                    rows={3}
-                    className="rounded-2xl border border-[#eadedb] bg-[#fffaf9] px-4 py-3 text-sm outline-none transition placeholder:text-[#b99f99] focus:border-[#c62828]"
-                  />
+                  <textarea value={customer.address} onChange={(event) => updateCustomer("address", event.target.value)} placeholder="Số nhà, đường, phường/xã, quận/huyện..." rows={3} className="rounded-2xl border border-[#eadedb] bg-[#fffaf9] px-4 py-3 text-sm outline-none transition placeholder:text-[#b99f99] focus:border-[#c62828]" />
                 </label>
                 <label className="grid gap-2 text-sm font-medium text-[#694f49]">
                   Ghi chú
-                  <textarea
-                    value={customer.note}
-                    onChange={(event) => updateCustomer("note", event.target.value)}
-                    placeholder="Ví dụ: Giao sau 18h, thêm tương ớt..."
-                    rows={3}
-                    className="rounded-2xl border border-[#eadedb] bg-[#fffaf9] px-4 py-3 text-sm outline-none transition placeholder:text-[#b99f99] focus:border-[#c62828]"
-                  />
+                  <textarea value={customer.note} onChange={(event) => updateCustomer("note", event.target.value)} placeholder="Ví dụ: Giao sau 18h" rows={3} className="rounded-2xl border border-[#eadedb] bg-[#fffaf9] px-4 py-3 text-sm outline-none transition placeholder:text-[#b99f99] focus:border-[#c62828]" />
                 </label>
               </div>
             </section>
@@ -321,9 +349,7 @@ export default function AdminCreateOrderPage() {
                   <ShoppingCart className="h-5 w-5 text-[#c62828]" />
                   <h2 className="text-xl font-bold">Giỏ hàng</h2>
                 </div>
-                <span className="rounded-full bg-[#fff7f5] px-3 py-1 text-xs font-semibold text-[#b4534c]">
-                  {totalItems} món
-                </span>
+                <span className="rounded-full bg-[#fff7f5] px-3 py-1 text-xs font-semibold text-[#b4534c]">{totalItems} món</span>
               </div>
 
               {cart.length === 0 ? (
@@ -336,7 +362,7 @@ export default function AdminCreateOrderPage() {
                     <div key={item.id} className="rounded-2xl bg-[#fffaf9] p-3 ring-1 ring-[#f1e4e1]">
                       <div className="flex items-start gap-3">
                         <div className="relative h-16 w-16 overflow-hidden rounded-2xl">
-                          <Image src={item.image} alt={item.name} fill className="object-cover" />
+                          {item.image ? <Image src={item.image} alt={item.name} fill className="object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-[#ffe9e5] font-bold text-[#c62828]">{item.name.slice(0, 1)}</div>}
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-2">
@@ -344,33 +370,18 @@ export default function AdminCreateOrderPage() {
                               <h3 className="truncate font-semibold text-[#2b1715]">{item.name}</h3>
                               <p className="text-sm text-[#8b6d67]">{formatCurrency(item.price)}</p>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => removeItem(item.id)}
-                              className="rounded-full p-1.5 text-[#9d807a] transition hover:bg-[#fff1f0] hover:text-[#c62828]"
-                              aria-label={`Xóa ${item.name}`}
-                            >
+                            <button type="button" onClick={() => removeItem(item.id)} className="rounded-full p-1.5 text-[#9d807a] transition hover:bg-[#fff1f0] hover:text-[#c62828]" aria-label={`Xóa ${item.name}`}>
                               <Trash2 className="h-4 w-4" />
                             </button>
                           </div>
 
                           <div className="mt-3 flex items-center justify-between gap-3">
                             <div className="inline-flex items-center rounded-full bg-white p-1 ring-1 ring-[#eadedb]">
-                              <button
-                                type="button"
-                                onClick={() => updateQuantity(item.id, -1)}
-                                className="grid h-8 w-8 place-items-center rounded-full text-[#7d625d] transition hover:bg-[#fff1f0]"
-                                aria-label={`Giảm ${item.name}`}
-                              >
+                              <button type="button" onClick={() => updateQuantity(item.id, -1)} className="grid h-8 w-8 place-items-center rounded-full text-[#7d625d] transition hover:bg-[#fff1f0]" aria-label={`Giảm ${item.name}`}>
                                 <Minus className="h-4 w-4" />
                               </button>
                               <span className="min-w-9 px-2 text-center text-sm font-bold text-[#2b1715]">{item.quantity}</span>
-                              <button
-                                type="button"
-                                onClick={() => updateQuantity(item.id, 1)}
-                                className="grid h-8 w-8 place-items-center rounded-full text-[#7d625d] transition hover:bg-[#fff1f0]"
-                                aria-label={`Tăng ${item.name}`}
-                              >
+                              <button type="button" onClick={() => updateQuantity(item.id, 1)} className="grid h-8 w-8 place-items-center rounded-full text-[#7d625d] transition hover:bg-[#fff1f0]" aria-label={`Tăng ${item.name}`}>
                                 <Plus className="h-4 w-4" />
                               </button>
                             </div>
@@ -385,16 +396,8 @@ export default function AdminCreateOrderPage() {
 
               <div className="mt-5 space-y-3 border-t border-[#f2e5e2] pt-4 text-sm">
                 <div className="flex items-center justify-between text-[#7d625d]">
-                  <span>Tạm tính</span>
-                  <span className="font-semibold text-[#2b1715]">{formatCurrency(subtotal)}</span>
-                </div>
-                <div className="flex items-center justify-between text-[#7d625d]">
-                  <span>Phí giao hàng</span>
-                  <span className="font-semibold text-[#2b1715]">{shipping === 0 ? "Miễn phí" : formatCurrency(shipping)}</span>
-                </div>
-                <div className="flex items-center justify-between border-t border-dashed border-[#eadedb] pt-3">
-                  <span className="text-base font-bold text-[#2b1715]">Tổng tiền</span>
-                  <span className="text-xl font-black text-[#c62828]">{formatCurrency(total)}</span>
+                  <span>Tổng tiền</span>
+                  <span className="font-semibold text-[#2b1715]">{formatCurrency(total)}</span>
                 </div>
               </div>
 
@@ -406,11 +409,7 @@ export default function AdminCreateOrderPage() {
                 <label className="grid gap-2 text-sm font-medium text-[#694f49]">
                   <span className="sr-only">Gán đơn cho shipper hoặc chi nhánh</span>
                   <div className="relative">
-                    <select
-                      value={assignTo}
-                      onChange={(event) => setAssignTo(event.target.value as (typeof assignTargets)[number])}
-                      className="h-12 w-full appearance-none rounded-2xl border border-[#eadedb] bg-white px-4 pr-11 text-sm outline-none transition focus:border-[#c62828]"
-                    >
+                    <select value={assignTo} onChange={(event) => setAssignTo(event.target.value as (typeof assignTargets)[number])} className="h-12 w-full appearance-none rounded-2xl border border-[#eadedb] bg-white px-4 pr-11 text-sm outline-none transition focus:border-[#c62828]">
                       {assignTargets.map((target) => (
                         <option key={target} value={target}>
                           {target}
@@ -422,17 +421,17 @@ export default function AdminCreateOrderPage() {
                 </label>
                 <div className="flex items-start gap-2 rounded-2xl bg-white px-3 py-3 text-xs text-[#8b6d67] ring-1 ring-[#f2e5e2]">
                   <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-[#c62828]" />
-                  <p>
-                    Admin có thể gán đơn trực tiếp cho shipper hoặc chi nhánh để điều phối xử lý nhanh hơn.
-                  </p>
+                  <p>Admin có thể gán đơn trực tiếp cho shipper hoặc chi nhánh để điều phối xử lý nhanh hơn.</p>
                 </div>
               </div>
 
               <button
                 type="button"
-                className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#c62828] px-4 py-4 text-sm font-bold text-white shadow-lg shadow-[#c62828]/20 transition hover:bg-[#a61f1f]"
+                onClick={handleCreateOrder}
+                disabled={cart.length === 0 || isSubmitting}
+                className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#c62828] px-4 py-4 text-sm font-bold text-white shadow-lg shadow-[#c62828]/20 transition hover:bg-[#a61f1f] disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Lưu đơn hàng
+                {isSubmitting ? "Đang tạo đơn..." : "Tạo đơn"}
               </button>
             </section>
           </aside>
@@ -462,22 +461,14 @@ export default function AdminCreateOrderPage() {
 
       {drawerOpen ? (
         <div className="fixed inset-0 z-30 bg-black/40 lg:hidden" onClick={() => setDrawerOpen(false)}>
-          <div
-            className="absolute inset-x-0 bottom-0 max-h-[88vh] overflow-y-auto rounded-t-[28px] bg-[#fffdfc] p-4 shadow-[0_-16px_40px_rgba(17,24,39,0.2)]"
-            onClick={(event) => event.stopPropagation()}
-          >
+          <div className="absolute inset-x-0 bottom-0 max-h-[88vh] overflow-y-auto rounded-t-[28px] bg-[#fffdfc] p-4 shadow-[0_-16px_40px_rgba(17,24,39,0.2)]" onClick={(event) => event.stopPropagation()}>
             <div className="mx-auto mb-4 h-1.5 w-14 rounded-full bg-[#eadedb]" />
             <div className="mb-4 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <ShoppingCart className="h-5 w-5 text-[#c62828]" />
                 <h2 className="text-lg font-bold text-[#2b1715]">Giỏ hàng & thanh toán</h2>
               </div>
-              <button
-                type="button"
-                onClick={() => setDrawerOpen(false)}
-                className="rounded-full p-2 text-[#7d625d] transition hover:bg-[#fff1f0]"
-                aria-label="Đóng"
-              >
+              <button type="button" onClick={() => setDrawerOpen(false)} className="rounded-full p-2 text-[#7d625d] transition hover:bg-[#fff1f0]" aria-label="Đóng">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -487,32 +478,10 @@ export default function AdminCreateOrderPage() {
                 <User2 className="h-5 w-5 text-[#c62828]" />
                 <h3 className="text-base font-bold text-[#2b1715]">Thông tin khách hàng</h3>
               </div>
-              <input
-                value={customer.name}
-                onChange={(event) => updateCustomer("name", event.target.value)}
-                placeholder="Tên khách hàng"
-                className="h-12 rounded-2xl border border-[#eadedb] bg-[#fffaf9] px-4 text-sm outline-none transition placeholder:text-[#b99f99] focus:border-[#c62828]"
-              />
-              <input
-                value={customer.phone}
-                onChange={(event) => updateCustomer("phone", event.target.value)}
-                placeholder="Số điện thoại"
-                className="h-12 rounded-2xl border border-[#eadedb] bg-[#fffaf9] px-4 text-sm outline-none transition placeholder:text-[#b99f99] focus:border-[#c62828]"
-              />
-              <textarea
-                value={customer.address}
-                onChange={(event) => updateCustomer("address", event.target.value)}
-                placeholder="Địa chỉ giao hàng chi tiết"
-                rows={3}
-                className="rounded-2xl border border-[#eadedb] bg-[#fffaf9] px-4 py-3 text-sm outline-none transition placeholder:text-[#b99f99] focus:border-[#c62828]"
-              />
-              <textarea
-                value={customer.note}
-                onChange={(event) => updateCustomer("note", event.target.value)}
-                placeholder="Ghi chú"
-                rows={3}
-                className="rounded-2xl border border-[#eadedb] bg-[#fffaf9] px-4 py-3 text-sm outline-none transition placeholder:text-[#b99f99] focus:border-[#c62828]"
-              />
+              <input value={customer.name} onChange={(event) => updateCustomer("name", event.target.value)} placeholder="Tên khách hàng" className="h-12 rounded-2xl border border-[#eadedb] bg-[#fffaf9] px-4 text-sm outline-none transition placeholder:text-[#b99f99] focus:border-[#c62828]" />
+              <input value={customer.phone} onChange={(event) => updateCustomer("phone", event.target.value)} placeholder="Số điện thoại" className="h-12 rounded-2xl border border-[#eadedb] bg-[#fffaf9] px-4 text-sm outline-none transition placeholder:text-[#b99f99] focus:border-[#c62828]" />
+              <textarea value={customer.address} onChange={(event) => updateCustomer("address", event.target.value)} placeholder="Địa chỉ giao hàng chi tiết" rows={3} className="rounded-2xl border border-[#eadedb] bg-[#fffaf9] px-4 py-3 text-sm outline-none transition placeholder:text-[#b99f99] focus:border-[#c62828]" />
+              <textarea value={customer.note} onChange={(event) => updateCustomer("note", event.target.value)} placeholder="Ghi chú" rows={3} className="rounded-2xl border border-[#eadedb] bg-[#fffaf9] px-4 py-3 text-sm outline-none transition placeholder:text-[#b99f99] focus:border-[#c62828]" />
             </section>
 
             <section className="mt-4 space-y-3 rounded-[24px] bg-white p-4 ring-1 ring-[#f4e9e7]">
@@ -521,11 +490,7 @@ export default function AdminCreateOrderPage() {
                 Gán đơn cho Admin
               </div>
               <div className="relative">
-                <select
-                  value={assignTo}
-                  onChange={(event) => setAssignTo(event.target.value as (typeof assignTargets)[number])}
-                  className="h-12 w-full appearance-none rounded-2xl border border-[#eadedb] bg-[#fffaf9] px-4 pr-11 text-sm outline-none transition focus:border-[#c62828]"
-                >
+                <select value={assignTo} onChange={(event) => setAssignTo(event.target.value as (typeof assignTargets)[number])} className="h-12 w-full appearance-none rounded-2xl border border-[#eadedb] bg-[#fffaf9] px-4 pr-11 text-sm outline-none transition focus:border-[#c62828]">
                   {assignTargets.map((target) => (
                     <option key={target} value={target}>
                       {target}
@@ -538,15 +503,13 @@ export default function AdminCreateOrderPage() {
 
             <div className="mt-4 space-y-3">
               {cart.length === 0 ? (
-                <div className="rounded-3xl border border-dashed border-[#ead7d3] bg-[#fffaf9] px-4 py-10 text-center text-sm text-[#9d807a]">
-                  Chưa có món nào được chọn.
-                </div>
+                <div className="rounded-3xl border border-dashed border-[#ead7d3] bg-[#fffaf9] px-4 py-10 text-center text-sm text-[#9d807a]">Chưa có món nào được chọn.</div>
               ) : (
                 cart.map((item) => (
                   <div key={item.id} className="rounded-2xl bg-[#fffaf9] p-3 ring-1 ring-[#f1e4e1]">
                     <div className="flex items-start gap-3">
                       <div className="relative h-16 w-16 overflow-hidden rounded-2xl">
-                        <Image src={item.image} alt={item.name} fill className="object-cover" />
+                        {item.image ? <Image src={item.image} alt={item.name} fill className="object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-[#ffe9e5] font-bold text-[#c62828]">{item.name.slice(0, 1)}</div>}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-2">
@@ -554,31 +517,18 @@ export default function AdminCreateOrderPage() {
                             <h3 className="truncate font-semibold text-[#2b1715]">{item.name}</h3>
                             <p className="text-sm text-[#8b6d67]">{formatCurrency(item.price)}</p>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => removeItem(item.id)}
-                            className="rounded-full p-1.5 text-[#9d807a] transition hover:bg-[#fff1f0] hover:text-[#c62828]"
-                            aria-label={`Xóa ${item.name}`}
-                          >
+                          <button type="button" onClick={() => removeItem(item.id)} className="rounded-full p-1.5 text-[#9d807a] transition hover:bg-[#fff1f0] hover:text-[#c62828]" aria-label={`Xóa ${item.name}`}>
                             <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
 
                         <div className="mt-3 flex items-center justify-between gap-3">
                           <div className="inline-flex items-center rounded-full bg-white p-1 ring-1 ring-[#eadedb]">
-                            <button
-                              type="button"
-                              onClick={() => updateQuantity(item.id, -1)}
-                              className="grid h-8 w-8 place-items-center rounded-full text-[#7d625d] transition hover:bg-[#fff1f0]"
-                            >
+                            <button type="button" onClick={() => updateQuantity(item.id, -1)} className="grid h-8 w-8 place-items-center rounded-full text-[#7d625d] transition hover:bg-[#fff1f0]">
                               <Minus className="h-4 w-4" />
                             </button>
                             <span className="min-w-9 px-2 text-center text-sm font-bold text-[#2b1715]">{item.quantity}</span>
-                            <button
-                              type="button"
-                              onClick={() => updateQuantity(item.id, 1)}
-                              className="grid h-8 w-8 place-items-center rounded-full text-[#7d625d] transition hover:bg-[#fff1f0]"
-                            >
+                            <button type="button" onClick={() => updateQuantity(item.id, 1)} className="grid h-8 w-8 place-items-center rounded-full text-[#7d625d] transition hover:bg-[#fff1f0]">
                               <Plus className="h-4 w-4" />
                             </button>
                           </div>
@@ -593,23 +543,12 @@ export default function AdminCreateOrderPage() {
 
             <div className="mt-4 rounded-[24px] bg-white p-4 ring-1 ring-[#f4e9e7]">
               <div className="flex items-center justify-between text-sm text-[#7d625d]">
-                <span>Tạm tính</span>
-                <span className="font-semibold text-[#2b1715]">{formatCurrency(subtotal)}</span>
-              </div>
-              <div className="mt-2 flex items-center justify-between text-sm text-[#7d625d]">
-                <span>Phí giao hàng</span>
-                <span className="font-semibold text-[#2b1715]">{shipping === 0 ? "Miễn phí" : formatCurrency(shipping)}</span>
-              </div>
-              <div className="mt-3 flex items-center justify-between border-t border-dashed border-[#eadedb] pt-3">
-                <span className="text-base font-bold text-[#2b1715]">Tổng tiền</span>
-                <span className="text-xl font-black text-[#c62828]">{formatCurrency(total)}</span>
+                <span>Tổng tiền</span>
+                <span className="font-semibold text-[#2b1715]">{formatCurrency(total)}</span>
               </div>
 
-              <button
-                type="button"
-                className="mt-4 w-full rounded-2xl bg-[#c62828] px-4 py-4 text-sm font-bold text-white shadow-lg shadow-[#c62828]/20 transition hover:bg-[#a61f1f]"
-              >
-                Lưu đơn hàng
+              <button type="button" onClick={handleCreateOrder} disabled={cart.length === 0 || isSubmitting} className="mt-4 w-full rounded-2xl bg-[#c62828] px-4 py-4 text-sm font-bold text-white shadow-lg shadow-[#c62828]/20 transition hover:bg-[#a61f1f] disabled:cursor-not-allowed disabled:opacity-50">
+                {isSubmitting ? "Đang tạo đơn..." : "Tạo đơn"}
               </button>
             </div>
           </div>

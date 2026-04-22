@@ -3,15 +3,16 @@
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import {
-  addDoc,
   collection,
   deleteDoc,
   doc,
   onSnapshot,
   orderBy,
   query,
+  setDoc,
   updateDoc,
 } from "firebase/firestore";
+import { createUserWithEmailAndPassword } from "firebase/auth";
 import {
   ArrowUpRight,
   BriefcaseBusiness,
@@ -28,7 +29,7 @@ import {
   X,
 } from "lucide-react";
 
-import { db } from "@/app/lib/firebase";
+import { auth, db } from "@/app/lib/firebase";
 
 type EmployeeRole = "Admin" | "Staff" | "CTV" | "Shipper";
 type EmployeeDoc = {
@@ -55,16 +56,28 @@ type RoleMeta = {
 };
 
 const roleMeta: Record<EmployeeRole, RoleMeta> = {
-  Admin: { label: "Admin", className: "bg-[#fff1f0] text-[#c62828] ring-1 ring-[#f4c6c0]", icon: UserCog },
-  Staff: { label: "Staff", className: "bg-[#edf8ee] text-[#1b7f3a] ring-1 ring-[#c7ead0]", icon: ShieldCheck },
-  CTV: { label: "CTV", className: "bg-[#f2eaff] text-[#7a3db8] ring-1 ring-[#dcc9f5]", icon: BriefcaseBusiness },
-  Shipper: { label: "Shipper", className: "bg-[#fff4e5] text-[#c96a00] ring-1 ring-[#f5d1a2]", icon: Truck },
+  Admin: { label: "admin", className: "bg-[#fff1f0] text-[#c62828] ring-1 ring-[#f4c6c0]", icon: UserCog },
+  Staff: { label: "staff", className: "bg-[#edf8ee] text-[#1b7f3a] ring-1 ring-[#c7ead0]", icon: ShieldCheck },
+  CTV: { label: "ctv", className: "bg-[#f2eaff] text-[#7a3db8] ring-1 ring-[#dcc9f5]", icon: BriefcaseBusiness },
+  Shipper: { label: "shipper", className: "bg-[#fff4e5] text-[#c96a00] ring-1 ring-[#f5d1a2]", icon: Truck },
+};
+
+const roleValues = ["Admin", "Staff", "CTV", "Shipper"] as const;
+const roleLabels: Record<EmployeeRole, string> = {
+  Admin: "admin",
+  Staff: "staff",
+  CTV: "ctv",
+  Shipper: "shipper",
 };
 
 const emptyForm: FormState = { ho_ten: "", email: "", so_dien_thoai: "", mat_khau: "", role: "Staff" };
 
 function normalizeRole(value: unknown): EmployeeRole {
   if (value === "Admin" || value === "Staff" || value === "CTV" || value === "Shipper") return value;
+  if (value === "admin") return "Admin";
+  if (value === "staff") return "Staff";
+  if (value === "ctv") return "CTV";
+  if (value === "shipper") return "Shipper";
   return "Staff";
 }
 
@@ -180,8 +193,12 @@ export default function AdminHrPage() {
         await updateDoc(doc(db, "users", editingEmployee.id), payload);
         setMessage("Đã cập nhật nhân sự.");
       } else {
-        await addDoc(collection(db, "users"), payload);
-        setMessage("Đã thêm nhân sự mới.");
+        const credential = await createUserWithEmailAndPassword(auth, payload.email, payload.mat_khau);
+        await setDoc(doc(db, "users", credential.user.uid), {
+          ...payload,
+          uid: credential.user.uid,
+        });
+        setMessage("Đã thêm nhân sự mới và tạo tài khoản đăng nhập.");
       }
 
       closeModal();
@@ -274,9 +291,9 @@ export default function AdminHrPage() {
         </div>
 
         <div className="mt-5 flex flex-wrap gap-2">
-          {(["Tất cả", "Admin", "Staff", "CTV", "Shipper"] as const).map((role) => (
+          {(["Tất cả", ...roleValues] as const).map((role) => (
             <button key={role} type="button" onClick={() => setFilterRole(role)} className={`rounded-full px-4 py-2 text-sm font-semibold transition ${filterRole === role ? "bg-[#c62828] text-white" : "bg-[#fff7f6] text-[#6f5752] hover:bg-[#f6ecea]"}`}>
-              {role}
+              {roleLabels[role as EmployeeRole] ?? role}
             </button>
           ))}
         </div>

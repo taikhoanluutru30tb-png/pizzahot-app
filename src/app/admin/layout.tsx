@@ -38,7 +38,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Quản lý đơn hàng", href: "/admin/orders", icon: ClipboardList },
   { label: "Xếp shipper", href: "/admin/delivery", icon: ShoppingBag },
   { label: "Quản lý nhân sự", href: "/admin/hr", icon: Users },
-  { label: "Cài đặt chấm công", href: "/admin/timekeeping", icon: Store },
+  { label: "Chấm công", href: "/admin/timekeeping", icon: Store },
   { label: "Tin nhắn", href: "/admin/message", icon: MessageSquareText },
   { label: "Hồ sơ cá nhân", href: "/admin/profile", icon: Settings2 },
 ];
