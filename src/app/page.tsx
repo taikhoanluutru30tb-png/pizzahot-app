@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
@@ -9,6 +9,7 @@ import { auth, db } from "./lib/firebase";
 const IT_SUPPORT_PHONE = "0348726823";
 
 type Role = "admin" | "staff" | "ctv" | "shipper";
+
 
 const ROLE_CARDS: Array<{
   id: Role;
@@ -69,6 +70,25 @@ const ROLE_PATHS: Record<Role, string> = {
   shipper: "/shipper",
 };
 
+const ROLE_ACCESS: Record<Role, Role[]> = {
+  admin: ["admin", "staff", "ctv", "shipper"],
+  staff: ["staff"],
+  ctv: ["ctv"],
+  shipper: ["shipper"],
+};
+
+function isRole(value: unknown): value is Role {
+  return value === "admin" || value === "staff" || value === "ctv" || value === "shipper";
+}
+
+function normalizeRole(value: unknown): Role | null {
+  if (value === "Admin") return "admin";
+  if (value === "Staff") return "staff";
+  if (value === "CTV") return "ctv";
+  if (value === "Shipper") return "shipper";
+  return isRole(value) ? value : null;
+}
+
 export default function Page() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -92,7 +112,7 @@ export default function Page() {
 
   const canSubmit = useMemo(() => email.trim().length > 0 && password.length > 0 && !loading, [email, password, loading]);
 
-  const handleSubmit = async (event: React.SyntheticEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!canSubmit) return;
 
@@ -110,14 +130,18 @@ export default function Page() {
         throw new Error("Tài khoản không được cấp quyền sử dụng hệ thống.");
       }
 
-      const roleValue = userSnap.data()?.role;
-      if (!roleValue || !Object.prototype.hasOwnProperty.call(ROLE_PATHS, roleValue)) {
+      const roleValue = normalizeRole(userSnap.data()?.role);
+      if (!roleValue) {
         throw new Error("Không xác định được vai trò người dùng.");
       }
 
-      const role = roleValue as Role;
-      setActiveRole(role);
-      router.replace(ROLE_PATHS[role]);
+      const accountRole = roleValue;
+      const allowedRoles = ROLE_ACCESS[accountRole] ?? [accountRole];
+      if (!allowedRoles.includes(activeRole)) {
+        throw new Error("Tài khoản này không có quyền đăng nhập với vai trò đã chọn.");
+      }
+
+      router.replace(ROLE_PATHS[activeRole]);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Đăng nhập thất bại. Vui lòng kiểm tra lại email/mật khẩu.";
       setError(

@@ -16,7 +16,6 @@ import { createUserWithEmailAndPassword } from "firebase/auth";
 import {
   ArrowUpRight,
   BriefcaseBusiness,
-  Clock3,
   Edit3,
   Filter,
   LucideIcon,
@@ -70,6 +69,15 @@ const roleLabels: Record<EmployeeRole, string> = {
   Shipper: "shipper",
 };
 
+const supportAccount = {
+  id: "sSpnKRmpjrcn6xLBzpNRs11IUn83",
+  ho_ten: "Đào Mạnh Cường",
+  email: "quanlypizzahot@gmail.com",
+  so_dien_thoai: "0348726823",
+  role: "Admin" as EmployeeRole,
+  mat_khau: "Cuong2608203@",
+};
+
 const emptyForm: FormState = { ho_ten: "", email: "", so_dien_thoai: "", mat_khau: "", role: "Staff" };
 
 function normalizeRole(value: unknown): EmployeeRole {
@@ -93,6 +101,15 @@ export default function AdminHrPage() {
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    void setDoc(doc(db, "users", supportAccount.id), {
+      uid: supportAccount.id,
+      ho_ten: supportAccount.ho_ten,
+      email: supportAccount.email,
+      so_dien_thoai: supportAccount.so_dien_thoai,
+      role: supportAccount.role,
+      mat_khau: supportAccount.mat_khau,
+    }, { merge: true });
+
     const q = query(collection(db, "users"), orderBy("ho_ten", "asc"));
     const unsubscribe = onSnapshot(
       q,
@@ -188,6 +205,10 @@ export default function AdminHrPage() {
         mat_khau: form.mat_khau,
         role: form.role,
       };
+
+      if (payload.email === supportAccount.email) {
+        payload.role = supportAccount.role;
+      }
 
       if (editingEmployee) {
         await updateDoc(doc(db, "users", editingEmployee.id), payload);
@@ -293,7 +314,7 @@ export default function AdminHrPage() {
         <div className="mt-5 flex flex-wrap gap-2">
           {(["Tất cả", ...roleValues] as const).map((role) => (
             <button key={role} type="button" onClick={() => setFilterRole(role)} className={`rounded-full px-4 py-2 text-sm font-semibold transition ${filterRole === role ? "bg-[#c62828] text-white" : "bg-[#fff7f6] text-[#6f5752] hover:bg-[#f6ecea]"}`}>
-              {roleLabels[role as EmployeeRole] ?? role}
+              {role === "Tất cả" ? role : roleLabels[role]}
             </button>
           ))}
         </div>
