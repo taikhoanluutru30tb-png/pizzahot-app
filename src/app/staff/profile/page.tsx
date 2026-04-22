@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useMemo, useState } from "react";
-import { Camera, Check, Edit3, LogOut, Mail, Phone, User2 } from "lucide-react";
+import { Camera, Check, Edit3, Mail, Phone, User2 } from "lucide-react";
 
 type ProfileForm = {
   fullName: string;
@@ -49,12 +49,8 @@ export default function CtvProfilePage() {
               <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#b58f88]">
                 Hồ sơ & cài đặt tài khoản
               </p>
-              <h1 className="text-2xl font-black tracking-tight text-[#3b2420] sm:text-3xl">
-                User Profile
-              </h1>
-              <p className="max-w-2xl text-sm leading-6 text-[#94736d] sm:text-base">
-                Cập nhật thông tin cá nhân, tài khoản ngân hàng nhận lương/hoa hồng và đăng xuất khi cần.
-              </p>
+              <h1 className="text-2xl font-black tracking-tight text-[#3b2420] sm:text-3xl">Hồ sơ cá nhân</h1>
+              <p className="max-w-2xl text-sm leading-6 text-[#94736d] sm:text-base">Cập nhật thông tin cá nhân và tài khoản ngân hàng nhận lương/hoa hồng.</p>
             </div>
 
             <button
@@ -127,21 +123,6 @@ export default function CtvProfilePage() {
                 </button>
               </div>
 
-              <section className="rounded-[26px] bg-white p-4 shadow-[0_10px_28px_rgba(97,39,25,0.05)] ring-1 ring-[#f1e4e0] sm:p-5">
-                <h3 className="text-sm font-extrabold uppercase tracking-[0.2em] text-[#a57e76]">
-                  Tùy chọn tài khoản
-                </h3>
-
-                <div className="mt-4 space-y-3">
-                  <button
-                    type="button"
-                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#c62828] px-5 py-3.5 text-sm font-bold text-white shadow-[0_10px_24px_rgba(198,40,40,0.22)] transition active:scale-[0.99]"
-                  >
-                    <LogOut className="h-4 w-4" />
-                    Đăng xuất
-                  </button>
-                </div>
-              </section>
             </div>
           </div>
         </section>

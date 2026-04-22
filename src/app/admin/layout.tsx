@@ -12,7 +12,6 @@ import {
   ClipboardList,
   LayoutDashboard,
   LogOut,
-  Menu,
   MessageSquareText,
   PackagePlus,
   Settings2,
@@ -32,16 +31,16 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { label: "Dashboard", href: "/admin", icon: LayoutDashboard },
+  { label: "Trang chủ", href: "/admin", icon: LayoutDashboard },
   { label: "Báo cáo", href: "/admin/report", icon: BarChart3 },
   { label: "Tạo đơn hàng", href: "/admin/create-order", icon: PackagePlus },
   { label: "Quản lý thực đơn", href: "/admin/menu", icon: UtensilsCrossed },
   { label: "Quản lý đơn hàng", href: "/admin/orders", icon: ClipboardList },
-  { label: "Điều phối giao hàng", href: "/admin/delivery", icon: ShoppingBag },
+  { label: "Xếp shipper", href: "/admin/delivery", icon: ShoppingBag },
   { label: "Quản lý nhân sự", href: "/admin/hr", icon: Users },
+  { label: "Cài đặt chấm công", href: "/admin/timekeeping", icon: Store },
   { label: "Tin nhắn", href: "/admin/message", icon: MessageSquareText },
   { label: "Hồ sơ cá nhân", href: "/admin/profile", icon: Settings2 },
-  { label: "Cài đặt chấm công", href: "/admin/timekeeping", icon: Store },
 ];
 
 function isAdminRole(role: unknown): role is AdminRole {
@@ -52,7 +51,6 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [loading, setLoading] = useState(true);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
@@ -155,14 +153,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       </aside>
 
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-[#eddcda] bg-white/90 px-4 py-3 backdrop-blur lg:hidden">
-        <button
-          type="button"
-          onClick={() => setMobileMenuOpen((prev) => !prev)}
-          className="grid h-11 w-11 place-items-center rounded-2xl bg-[#dc2626] text-white"
-          aria-label="Mở menu"
-        >
-          <Menu className="h-5 w-5" />
-        </button>
+        <div className="h-11 w-11" />
         <div className="text-center">
           <div className="text-lg font-extrabold text-[#dc2626]">Pizza Hot</div>
           <div className="text-xs text-[#8a6d68]">Quản lý</div>
@@ -170,45 +161,13 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         <div className="h-11 w-11" />
       </header>
 
-      {mobileMenuOpen ? (
-        <div className="fixed inset-0 z-40 bg-black/40 lg:hidden" onClick={() => setMobileMenuOpen(false)}>
-          <div
-            className="absolute left-0 top-0 h-full w-[82%] max-w-[320px] bg-[#0a0a0a] p-5 text-white"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="px-2 text-center">
-              <h1 className="text-3xl font-extrabold text-[#dc2626]">Pizza Hot</h1>
-              <p className="text-sm text-[#c9a9a5]">Quản lý</p>
-            </div>
-            <div className="mt-6 space-y-3">
-              {NAV_ITEMS.map((item) => {
-                const Icon = item.icon;
-                const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={`flex items-center gap-3 rounded-2xl px-4 py-3 font-semibold ${active ? "bg-[#dc2626] text-white" : "bg-white text-[#5c4340]"}`}
-                  >
-                    <Icon className="h-5 w-5" />
-                    <span>{item.label}</span>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      <main className="min-h-[calc(100vh-64px)] px-4 pb-24 pt-4 lg:px-8 lg:pb-8 lg:pt-8">
+      <main className="min-h-[calc(100vh-64px)] px-4 pb-32 pt-4 lg:px-8 lg:pb-8 lg:pt-8">
         <div className="mx-auto max-w-7xl">{children}</div>
       </main>
 
       <nav className="fixed bottom-0 left-0 right-0 z-30 border-t border-[#eddcda] bg-white/95 px-2 py-2 backdrop-blur lg:hidden">
-        <div className="grid grid-cols-5 gap-1">
-          {NAV_ITEMS.slice(0, 4).map((item) => {
+        <div className="flex gap-1 overflow-x-auto pb-1">
+          {NAV_ITEMS.map((item) => {
             const Icon = item.icon;
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
 
@@ -216,24 +175,13 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex flex-col items-center justify-center rounded-2xl px-2 py-2 text-[11px] font-medium ${active ? "bg-[#dc2626] text-white" : "text-[#7f625d]"}`}
+                className={`flex min-w-[78px] flex-col items-center justify-center rounded-2xl px-2 py-2 text-[11px] font-medium ${active ? "bg-[#dc2626] text-white" : "bg-transparent text-[#7f625d]"}`}
               >
                 <Icon className="mb-1 h-5 w-5" />
                 <span className="truncate">{item.label}</span>
               </Link>
             );
           })}
-          <button
-            type="button"
-            onClick={async () => {
-              await signOut(auth);
-              router.replace("/");
-            }}
-            className="flex flex-col items-center justify-center rounded-2xl px-2 py-2 text-[11px] font-medium text-[#7f625d]"
-          >
-            <LogOut className="mb-1 h-5 w-5" />
-            <span className="truncate">Đăng xuất</span>
-          </button>
         </div>
       </nav>
     </div>

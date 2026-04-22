@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { collection, onSnapshot, orderBy, query, where } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
 
+import { auth } from "@/app/lib/firebase";
 import { db } from "@/app/lib/firebase";
 
 type FirestoreOrder = {
@@ -19,8 +21,6 @@ type FirestoreOrder = {
 };
 
 type OrderStatus = string;
-
-const CTV_UID = "ctv-demo-uid";
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("vi-VN", {
@@ -52,22 +52,39 @@ function StatusBadge({ status }: { status: OrderStatus }) {
 export default function CtvOrdersPage() {
   const [orders, setOrders] = useState<FirestoreOrder[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [ctvUid, setCtvUid] = useState<string>("");
 
   useEffect(() => {
-    const q = query(
-      collection(db, "orders"),
-      where("nguoi_tao", "==", CTV_UID),
-      orderBy("thoi_gian_tao", "desc"),
-    );
+    let unsubscribeOrders: (() => void) | null = null;
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        setCtvUid("");
+        setOrders([]);
+        setError("Không xác định được tài khoản CTV hiện tại.");
+        return;
+      }
 
-    return onSnapshot(
-      q,
-      (snapshot) => {
-        const items = snapshot.docs.map((document) => ({ id: document.id, ...document.data() } as FirestoreOrder));
-        setOrders(items);
-      },
-      (snapshotError) => setError(snapshotError.message || "Không thể tải dữ liệu đơn hàng."),
-    );
+      setCtvUid(user.uid);
+      setError(null);
+      unsubscribeOrders?.();
+
+      const q = query(collection(db, "orders"), where("nguoi_tao", "==", user.uid));
+      unsubscribeOrders = onSnapshot(
+        q,
+        (snapshot) => {
+          const items = snapshot.docs
+            .map((document) => ({ id: document.id, ...document.data() } as FirestoreOrder))
+            .sort((a, b) => (b.thoi_gian_tao?.toDate?.().getTime() ?? 0) - (a.thoi_gian_tao?.toDate?.().getTime() ?? 0));
+          setOrders(items);
+        },
+        () => setError("Không thể tải dữ liệu đơn hàng. Vui lòng thử lại sau."),
+      );
+    });
+
+    return () => {
+      unsubscribeOrders?.();
+      unsubscribeAuth();
+    };
   }, []);
 
   const completedOrders = useMemo(
@@ -120,7 +137,7 @@ export default function CtvOrdersPage() {
           </div>
           <div className="rounded-[20px] bg-white px-4 py-4 shadow-[0_8px_22px_rgba(97,39,25,0.04)] ring-1 ring-[#f0e3df]">
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#a88d86]">UID</p>
-            <p className="mt-2 truncate text-sm font-bold text-[#3f2723]">{CTV_UID}</p>
+            <p className="mt-2 truncate text-sm font-bold text-[#3f2723]">{ctvUid || "Chưa xác định"}</p>
           </div>
         </div>
       </section>

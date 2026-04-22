@@ -10,7 +10,6 @@ import {
   ArrowRightLeft,
   CalendarCheck2,
   CornerDownLeft,
-  Home,
   LogOut,
   MessageSquareText,
   PackagePlus,
@@ -30,7 +29,7 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   { label: "Chấm công", href: "/staff", icon: CalendarCheck2 },
   { label: "Tạo đơn hàng", href: "/staff/create-order", icon: PackagePlus },
-  { label: "Điều phối", href: "/staff/delivery", icon: ArrowRightLeft },
+  { label: "Xếp shipper", href: "/staff/delivery", icon: ArrowRightLeft },
   { label: "Tin nhắn", href: "/staff/message", icon: MessageSquareText },
   { label: "Hồ sơ", href: "/staff/profile", icon: UserRound },
 ];
@@ -156,19 +155,19 @@ export default function StaffLayout({ children }: { children: ReactNode }) {
         <Link
           href="/staff/profile"
           className="grid h-11 w-11 place-items-center rounded-2xl bg-[#dc2626] text-white"
-          aria-label="Profile"
+          aria-label="Hồ sơ"
         >
           <UserRound className="h-5 w-5" />
         </Link>
       </header>
 
-      <main className="min-h-[calc(100vh-64px)] px-4 pb-24 pt-4 lg:px-8 lg:pb-8 lg:pt-8">
+      <main className="min-h-[calc(100vh-64px)] px-4 pb-32 pt-4 lg:px-8 lg:pb-8 lg:pt-8">
         <div className="mx-auto max-w-7xl">{children}</div>
       </main>
 
       <nav className="fixed bottom-0 left-0 right-0 z-30 border-t border-[#eddcda] bg-white/96 px-2 py-2 backdrop-blur lg:hidden">
-        <div className="grid grid-cols-5 gap-1">
-          {NAV_ITEMS.slice(0, 4).map((item) => {
+        <div className="flex gap-1 overflow-x-auto pb-1">
+          {NAV_ITEMS.map((item) => {
             const Icon = item.icon;
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
 
@@ -176,24 +175,13 @@ export default function StaffLayout({ children }: { children: ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex flex-col items-center justify-center rounded-2xl px-2 py-2 text-[11px] font-medium transition ${active ? "bg-[#dc2626] text-white" : "text-[#7f625d]"}`}
+                className={`flex min-w-[78px] flex-col items-center justify-center rounded-2xl px-2 py-2 text-[11px] font-medium transition ${active ? "bg-[#dc2626] text-white" : "bg-transparent text-[#7f625d]"}`}
               >
                 <Icon className="mb-1 h-5 w-5" />
                 <span className="truncate">{item.label}</span>
               </Link>
             );
           })}
-          <button
-            type="button"
-            onClick={async () => {
-              await signOut(auth);
-              router.replace("/");
-            }}
-            className="flex flex-col items-center justify-center rounded-2xl px-2 py-2 text-[11px] font-medium text-[#7f625d]"
-          >
-            <LogOut className="mb-1 h-5 w-5" />
-            <span className="truncate">Đăng xuất</span>
-          </button>
         </div>
       </nav>
     </div>

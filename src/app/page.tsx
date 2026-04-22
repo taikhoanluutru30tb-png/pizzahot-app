@@ -1,10 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "./lib/firebase";
+
+const IT_SUPPORT_PHONE = "0348726823";
 
 type Role = "admin" | "staff" | "ctv" | "shipper";
 
@@ -48,7 +50,7 @@ const ROLE_CARDS: Array<{
   },
   {
     id: "shipper",
-    label: "Shipper",
+    label: "Giao hàng",
     icon: (
       <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="8" cy="16" r="2" />
@@ -75,6 +77,18 @@ export default function Page() {
   const [loading, setLoading] = useState(false);
   const [activeRole, setActiveRole] = useState<Role>("admin");
   const [error, setError] = useState<string>("");
+  const [showSupportDialog, setShowSupportDialog] = useState(false);
+
+  useEffect(() => {
+    if (!showSupportDialog) return;
+
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setShowSupportDialog(false);
+    };
+
+    window.addEventListener("keydown", onEscape);
+    return () => window.removeEventListener("keydown", onEscape);
+  }, [showSupportDialog]);
 
   const canSubmit = useMemo(() => email.trim().length > 0 && password.length > 0 && !loading, [email, password, loading]);
 
@@ -233,24 +247,53 @@ export default function Page() {
 
         <div className="mt-8 text-center text-[0.9rem] text-[#8f7872]">
           <p>Gặp khó khăn khi truy cập?</p>
-          <a
-            href="https://zalo.me/0348726823"
-            target="_blank"
-            rel="noreferrer"
+          <button
+            type="button"
+            onClick={() => setShowSupportDialog(true)}
             className="mt-1 inline-block font-medium text-[#c4201d] hover:underline"
           >
-            Liên hệ IT Support
-          </a>
-          <div className="mt-2 flex items-center justify-center gap-3 text-sm">
-            <a href="tel:0348726823" className="font-medium text-[#c4201d] hover:underline">
-              0348726823
-            </a>
-            <span className="text-[#b7a19b]">•</span>
-            <a href="https://zalo.me/0348726823" target="_blank" rel="noreferrer" className="font-medium text-[#c4201d] hover:underline">
-              Zalo
-            </a>
-          </div>
+            Liên hệ hỗ trợ kỹ thuật
+          </button>
         </div>
+
+        {showSupportDialog ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+            <div className="w-full max-w-sm rounded-[24px] bg-white p-5 shadow-2xl">
+              <div className="text-center">
+                <h2 className="text-xl font-bold text-[#c4201d]">Liên hệ hỗ trợ kỹ thuật</h2>
+                <p className="mt-1 text-sm text-[#6e5a55]">Chọn cách liên hệ phù hợp</p>
+              </div>
+
+              <div className="mt-5 space-y-3">
+                <a
+                  href={`tel:${IT_SUPPORT_PHONE}`}
+                  className="flex items-center justify-between rounded-2xl bg-[#f5f3f2] px-4 py-4 font-semibold text-[#4c3e3a] transition hover:bg-[#efeaea]"
+                >
+                  <span>Số điện thoại</span>
+                  <span className="text-[#c4201d]">{IT_SUPPORT_PHONE}</span>
+                </a>
+
+                <a
+                  href={`https://zalo.me/${IT_SUPPORT_PHONE}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center justify-between rounded-2xl bg-[#f5f3f2] px-4 py-4 font-semibold text-[#4c3e3a] transition hover:bg-[#efeaea]"
+                >
+                  <span>Zalo hỗ trợ kỹ thuật</span>
+                  <span className="text-[#c4201d]">Mở Zalo</span>
+                </a>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowSupportDialog(false)}
+                className="mt-4 w-full rounded-2xl bg-[#c4201d] px-4 py-3 font-bold text-white transition hover:bg-[#ad1b18]"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
     </main>
   );

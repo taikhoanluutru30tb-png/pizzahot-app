@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
@@ -10,13 +11,11 @@ import {
   ChevronRight,
   Home,
   LogOut,
-  Menu,
   MessageSquare,
   ShoppingBag,
   SquarePen,
   UserRound,
   UserRoundPen,
-  X,
 } from "lucide-react";
 import { auth, db } from "../lib/firebase";
 
@@ -29,7 +28,7 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { label: "Dashboard", href: "/ctv", icon: Home },
+  { label: "Trang chủ", href: "/ctv", icon: Home },
   { label: "Tạo đơn hàng", href: "/ctv/create-order", icon: SquarePen },
   { label: "Lịch sử đơn hàng", href: "/ctv/orders", icon: ShoppingBag },
   { label: "Tin nhắn", href: "/ctv/message", icon: MessageSquare },
@@ -44,7 +43,6 @@ export default function CtvLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [loading, setLoading] = useState(true);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [displayName, setDisplayName] = useState("Tên nhân viên");
 
   useEffect(() => {
@@ -83,10 +81,6 @@ export default function CtvLayout({ children }: { children: ReactNode }) {
 
     return () => unsubscribe();
   }, [router]);
-
-  useEffect(() => {
-    setMobileMenuOpen(false);
-  }, [pathname]);
 
   if (loading) {
     return (
@@ -130,8 +124,14 @@ export default function CtvLayout({ children }: { children: ReactNode }) {
 
         <div className="mt-6 rounded-[24px] bg-[#121212] p-4 shadow-inner shadow-black/30 ring-1 ring-white/5">
           <div className="flex items-center gap-3">
-            <div className="grid h-14 w-14 place-items-center rounded-full bg-[#dc2626] text-white">
-              <UserRound className="h-7 w-7" />
+            <div className="grid h-14 w-14 place-items-center overflow-hidden rounded-full bg-[#dc2626] text-white">
+              <Image
+                src="/avatar-sidebar.png"
+                alt="Ảnh đại diện"
+                width={56}
+                height={56}
+                className="h-full w-full object-cover"
+              />
             </div>
             <div>
               <div className="text-lg font-bold text-[#f0cec9]">{displayName}</div>
@@ -164,14 +164,7 @@ export default function CtvLayout({ children }: { children: ReactNode }) {
 
       <header className="sticky top-0 z-40 border-b border-[#eddcda] bg-white/95 backdrop-blur lg:hidden">
         <div className="flex items-center justify-between px-4 py-3">
-          <button
-            type="button"
-            onClick={() => setMobileMenuOpen((value) => !value)}
-            className="grid h-11 w-11 place-items-center rounded-2xl bg-[#dc2626] text-white shadow-sm"
-            aria-label={mobileMenuOpen ? "Đóng menu" : "Mở menu"}
-          >
-            {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
+          <div className="h-11 w-11" />
 
           <div className="text-center">
             <div className="text-lg font-extrabold text-[#dc2626]">Pizza Hot</div>
@@ -181,42 +174,20 @@ export default function CtvLayout({ children }: { children: ReactNode }) {
           <Link
             href="/ctv/profile"
             className="grid h-11 w-11 place-items-center rounded-2xl bg-[#111111] text-white"
-            aria-label="Profile"
+            aria-label="Hồ sơ"
           >
             <UserRound className="h-5 w-5" />
           </Link>
         </div>
-
-        {mobileMenuOpen ? (
-          <div className="border-t border-[#eddcda] bg-white px-4 py-3 shadow-lg">
-            <nav className="grid gap-2">
-              {NAV_ITEMS.map((item) => {
-                const Icon = item.icon;
-                const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition ${active ? "bg-[#dc2626] text-white" : "bg-[#fff7f5] text-[#5b403b]"}`}
-                  >
-                    <Icon className="h-5 w-5" />
-                    <span>{item.label}</span>
-                  </Link>
-                );
-              })}
-            </nav>
-          </div>
-        ) : null}
       </header>
 
-      <main className="min-h-[calc(100vh-64px)] px-4 pb-24 pt-4 lg:px-8 lg:pb-8 lg:pt-8">
+      <main className="min-h-[calc(100vh-64px)] px-4 pb-32 pt-4 lg:px-8 lg:pb-8 lg:pt-8">
         <div className="mx-auto max-w-7xl">{children}</div>
       </main>
 
       <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-[#eddcda] bg-white/96 px-2 py-2 backdrop-blur lg:hidden">
-        <div className="grid grid-cols-5 gap-1">
-          {NAV_ITEMS.slice(0, 4).map((item) => {
+        <div className="flex gap-1 overflow-x-auto pb-1">
+          {NAV_ITEMS.map((item) => {
             const Icon = item.icon;
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
 
@@ -224,24 +195,13 @@ export default function CtvLayout({ children }: { children: ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex flex-col items-center justify-center rounded-2xl px-2 py-2 text-[11px] font-medium transition ${active ? "bg-[#dc2626] text-white" : "text-[#7f625d]"}`}
+                className={`flex min-w-[78px] flex-col items-center justify-center rounded-2xl px-2 py-2 text-[11px] font-medium transition ${active ? "bg-[#dc2626] text-white" : "bg-transparent text-[#7f625d]"}`}
               >
                 <Icon className="mb-1 h-5 w-5" />
                 <span className="truncate">{item.label}</span>
               </Link>
             );
           })}
-          <button
-            type="button"
-            onClick={async () => {
-              await signOut(auth);
-              router.replace("/");
-            }}
-            className="flex flex-col items-center justify-center rounded-2xl px-2 py-2 text-[11px] font-medium text-[#7f625d]"
-          >
-            <LogOut className="mb-1 h-5 w-5" />
-            <span className="truncate">Đăng xuất</span>
-          </button>
         </div>
       </nav>
     </div>

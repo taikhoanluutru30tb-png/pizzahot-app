@@ -11,7 +11,6 @@ import {
   CheckCircle2,
   Home,
   LayoutDashboard,
-  LogOut,
   Menu,
   MessageSquareText,
   Package2,
@@ -29,7 +28,7 @@ type NavItem = {
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Đơn đang giao", href: "/shipper", icon: LayoutDashboard },
-  { label: "Báo cáo đơn đã giao", href: "/shipper/report", icon: CheckCircle2 },
+  { label: "Đơn đã giao", href: "/shipper/report", icon: CheckCircle2 },
   { label: "Tin nhắn", href: "/shipper/message", icon: MessageSquareText },
   { label: "Hồ sơ", href: "/shipper/profile", icon: UserRound },
 ];
@@ -42,7 +41,6 @@ export default function ShipperLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [loading, setLoading] = useState(true);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
@@ -74,10 +72,6 @@ export default function ShipperLayout({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, [router]);
 
-  useEffect(() => {
-    setMobileMenuOpen(false);
-  }, [pathname]);
-
   const activeHref = useMemo(() => {
     return NAV_ITEMS.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))?.href;
   }, [pathname]);
@@ -98,7 +92,7 @@ export default function ShipperLayout({ children }: { children: ReactNode }) {
       <aside className="fixed inset-y-0 left-0 hidden w-[292px] flex-col border-r border-[#3a0f10] bg-[#0b0b0b] px-5 py-6 text-white shadow-[10px_0_40px_rgba(0,0,0,0.22)] lg:flex">
         <div className="px-2 text-center">
           <h1 className="text-4xl font-extrabold tracking-tight text-[#dc2626]">Pizza Hot</h1>
-          <p className="mt-1 text-sm text-[#d7b6b1]">Shipper</p>
+          <p className="mt-1 text-sm text-[#d7b6b1]">Giao hàng</p>
         </div>
 
         <nav className="mt-8 flex-1 space-y-4 overflow-y-auto pr-1">
@@ -128,7 +122,7 @@ export default function ShipperLayout({ children }: { children: ReactNode }) {
               <UserRound className="h-7 w-7" />
             </div>
             <div>
-              <div className="text-lg font-bold text-[#f0cec9]">Tên Shipper</div>
+              <div className="text-lg font-bold text-[#f0cec9]">Tên nhân viên</div>
               <div className="text-sm text-[#9f817d]">Giao hàng</div>
             </div>
           </div>
@@ -146,7 +140,7 @@ export default function ShipperLayout({ children }: { children: ReactNode }) {
               className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-[#dc2626] px-4 py-3 font-semibold text-white transition hover:bg-[#b91c1c]"
             >
               <Menu className="h-4 w-4" />
-              Menu
+              Danh mục
             </button>
           </div>
         </div>
@@ -154,60 +148,30 @@ export default function ShipperLayout({ children }: { children: ReactNode }) {
 
       <header className="sticky top-0 z-40 border-b border-[#eddcda] bg-white/92 backdrop-blur lg:hidden">
         <div className="flex items-center justify-between px-4 py-3">
-          <button
-            type="button"
-            onClick={() => setMobileMenuOpen((v) => !v)}
-            className="grid h-12 w-12 place-items-center rounded-2xl bg-[#dc2626] text-white shadow-lg shadow-[#dc2626]/20"
-            aria-label="Mở menu"
-            aria-expanded={mobileMenuOpen}
-          >
-            <Menu className="h-6 w-6" />
-          </button>
+          <div className="h-12 w-12" />
 
           <div className="text-center leading-tight">
             <div className="text-lg font-extrabold text-[#dc2626]">Pizza Hot</div>
-            <div className="text-xs text-[#8a6d68]">Shipper</div>
+            <div className="text-xs text-[#8a6d68]">Giao hàng</div>
           </div>
 
           <Link
             href="/shipper/profile"
             className="grid h-12 w-12 place-items-center rounded-2xl bg-[#dc2626] text-white shadow-lg shadow-[#dc2626]/20"
-            aria-label="User Profile"
+            aria-label="Hồ sơ"
           >
             <UserRound className="h-5 w-5" />
           </Link>
         </div>
-
-        {mobileMenuOpen ? (
-          <div className="border-t border-[#eddcda] bg-white px-3 py-3">
-            <nav className="grid gap-2">
-              {NAV_ITEMS.map((item) => {
-                const Icon = item.icon;
-                const active = activeHref === item.href;
-
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition ${active ? "bg-[#dc2626] text-white" : "bg-[#fff7f5] text-[#5c4340]"}`}
-                  >
-                    <Icon className="h-5 w-5" />
-                    <span>{item.label}</span>
-                  </Link>
-                );
-              })}
-            </nav>
-          </div>
-        ) : null}
       </header>
 
-      <main className="min-h-[calc(100vh-64px)] px-4 pb-24 pt-4 lg:px-8 lg:pb-8 lg:pt-8">
+      <main className="min-h-[calc(100vh-64px)] px-4 pb-32 pt-4 lg:px-8 lg:pb-8 lg:pt-8">
         <div className="mx-auto max-w-7xl">{children}</div>
       </main>
 
       <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-[#eddcda] bg-white/96 px-2 py-2 backdrop-blur lg:hidden">
-        <div className="grid grid-cols-4 gap-1">
-          {NAV_ITEMS.slice(0, 3).map((item) => {
+        <div className="flex gap-1 overflow-x-auto pb-1">
+          {NAV_ITEMS.map((item) => {
             const Icon = item.icon;
             const active = activeHref === item.href;
 
@@ -215,24 +179,13 @@ export default function ShipperLayout({ children }: { children: ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex flex-col items-center justify-center rounded-2xl px-2 py-2 text-[11px] font-medium transition ${active ? "bg-[#dc2626] text-white" : "text-[#7f625d]"}`}
+                className={`flex min-w-[78px] flex-col items-center justify-center rounded-2xl px-2 py-2 text-[11px] font-medium transition ${active ? "bg-[#dc2626] text-white" : "bg-transparent text-[#7f625d]"}`}
               >
                 <Icon className="mb-1 h-5 w-5" />
                 <span className="truncate">{item.label}</span>
               </Link>
             );
           })}
-          <button
-            type="button"
-            onClick={async () => {
-              await signOut(auth);
-              router.replace("/");
-            }}
-            className="flex flex-col items-center justify-center rounded-2xl px-2 py-2 text-[11px] font-medium text-[#7f625d]"
-          >
-            <LogOut className="mb-1 h-5 w-5" />
-            <span className="truncate">Đăng xuất</span>
-          </button>
         </div>
       </nav>
     </div>
