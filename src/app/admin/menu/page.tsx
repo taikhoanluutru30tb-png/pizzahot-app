@@ -7,9 +7,6 @@ import {
   collection,
   deleteDoc,
   doc,
-  onSnapshot,
-  orderBy,
-  query,
   serverTimestamp,
   updateDoc,
 } from "firebase/firestore";
@@ -26,15 +23,7 @@ import {
 } from "lucide-react";
 
 import { db } from "@/app/lib/firebase";
-
-type MenuItem = {
-  id: string;
-  name: string;
-  price: number;
-  category: string;
-  description: string;
-  imageUrl: string;
-};
+import { useMenuItems, type MenuItem } from "@/app/lib/use-menu-items";
 
 type MenuFormState = {
   name: string;
@@ -78,7 +67,7 @@ function ActionButton({ icon: Icon, label, tone = "neutral", onClick }: { icon: 
 }
 
 export default function AdminMenuPage() {
-  const [items, setItems] = useState<MenuItem[]>([]);
+  const { menuItems: items, error: menuError } = useMenuItems();
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("Tất cả");
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -87,34 +76,6 @@ export default function AdminMenuPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-
-  useEffect(() => {
-    const q = query(collection(db, "menu"), orderBy("createdAt", "desc"));
-
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const nextItems = snapshot.docs.map((document) => {
-          const data = document.data();
-          return {
-            id: document.id,
-            name: String(data.name ?? ""),
-            price: Number(data.price ?? 0),
-            category: String(data.category ?? ""),
-            description: String(data.description ?? ""),
-            imageUrl: String(data.imageUrl ?? ""),
-          } satisfies MenuItem;
-        });
-
-        setItems(nextItems);
-      },
-      (snapshotError) => {
-        setError(snapshotError.message || "Không thể tải dữ liệu menu.");
-      },
-    );
-
-    return () => unsubscribe();
-  }, []);
 
   const categories = useMemo(() => {
     const unique = Array.from(new Set(items.map((item) => item.category).filter(Boolean)));
@@ -254,8 +215,8 @@ export default function AdminMenuPage() {
         </div>
       </section>
 
-      {error ? (
-        <div className="rounded-2xl border border-[#f2d1d1] bg-[#fff7f7] px-4 py-3 text-sm font-medium text-[#b42318]">{error}</div>
+      {menuError || error ? (
+        <div className="rounded-2xl border border-[#f2d1d1] bg-[#fff7f7] px-4 py-3 text-sm font-medium text-[#b42318]">{menuError ?? error}</div>
       ) : null}
       {success ? (
         <div className="rounded-2xl border border-[#d9f0df] bg-[#f3fbf5] px-4 py-3 text-sm font-medium text-[#1f7a39]">{success}</div>

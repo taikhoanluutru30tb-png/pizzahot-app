@@ -1,15 +1,12 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   addDoc,
   collection,
-  onSnapshot,
-  orderBy,
-  query,
   serverTimestamp,
 } from "firebase/firestore";
 import {
@@ -29,15 +26,7 @@ import {
 } from "lucide-react";
 
 import { auth, db } from "@/app/lib/firebase";
-
-type MenuItem = {
-  id: string;
-  name: string;
-  price: number;
-  category: string;
-  description: string;
-  imageUrl: string;
-};
+import { useMenuItems, type MenuItem } from "@/app/lib/use-menu-items";
 
 type CartItem = MenuItem & { quantity: number };
 
@@ -47,8 +36,6 @@ type CustomerForm = {
   dia_chi: string;
   ghi_chu: string;
 };
-
-const categories = ["Tất cả"];
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", {
   style: "currency",
@@ -62,7 +49,7 @@ function formatCurrency(value: number) {
 
 export default function StaffCreateOrderPage() {
   const router = useRouter();
-  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const { menuItems, categories, error: menuError } = useMenuItems();
   const [activeCategory, setActiveCategory] = useState("Tất cả");
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -77,29 +64,6 @@ export default function StaffCreateOrderPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const q = query(collection(db, "menu"), orderBy("createdAt", "desc"));
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const items = snapshot.docs.map((document) => {
-          const data = document.data();
-          return {
-            id: document.id,
-            name: String(data.name ?? ""),
-            price: Number(data.price ?? 0),
-            category: String(data.category ?? ""),
-            description: String(data.description ?? ""),
-            imageUrl: String(data.imageUrl ?? ""),
-          } satisfies MenuItem;
-        });
-        setMenuItems(items);
-      },
-      (snapshotError) => setError(snapshotError.message || "Không thể tải thực đơn."),
-    );
-
-    return () => unsubscribe();
-  }, []);
 
   const visibleProducts = useMemo(() => {
     const keyword = search.trim().toLowerCase();
