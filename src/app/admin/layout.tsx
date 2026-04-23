@@ -10,7 +10,7 @@ import {
   BarChart3,
   ChevronRight,
   ClipboardList,
-  LayoutDashboard,
+  Home,
   LogOut,
   MessageSquareText,
   PackagePlus,
@@ -22,16 +22,14 @@ import {
 } from "lucide-react";
 import { auth, db } from "../lib/firebase";
 
-type AdminRole = "admin" | "tech_support";
-
 type NavItem = {
   label: string;
   href: string;
-  icon: typeof LayoutDashboard;
+  icon: typeof Home;
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { label: "Trang chủ", href: "/admin", icon: LayoutDashboard },
+  { label: "Trang chủ", href: "/admin", icon: Home },
   { label: "Báo cáo", href: "/admin/report", icon: BarChart3 },
   { label: "Tạo đơn hàng", href: "/admin/create-order", icon: PackagePlus },
   { label: "Quản lý thực đơn", href: "/admin/menu", icon: UtensilsCrossed },
@@ -43,15 +41,35 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Hồ sơ cá nhân", href: "/admin/profile", icon: Settings2 },
 ];
 
-function isAdminRole(role: unknown): role is AdminRole {
-  return role === "admin" || role === "tech_support";
+const ROLE_LABELS: Record<string, string> = {
+  admin: "Quản trị viên",
+  staff: "Nhân viên",
+  ctv: "CTV",
+  shipper: "Shipper",
+  tech_support: "Hỗ trợ kỹ thuật",
+};
+
+function getDisplayName(user: User, userData: Record<string, unknown> | undefined) {
+  const candidates = [
+    userData?.fullName,
+    userData?.displayName,
+    userData?.name,
+    user.displayName,
+    user.email,
+  ];
+
+  const found = candidates.find((value): value is string => typeof value === "string" && value.trim().length > 0);
+  return found ?? "Tài khoản đăng nhập";
 }
+
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [loading, setLoading] = useState(true);
   const [isTechSupport, setIsTechSupport] = useState(false);
+  const [displayName, setDisplayName] = useState("Tài khoản đăng nhập");
+  const [roleLabel, setRoleLabel] = useState(ROLE_LABELS.admin);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
@@ -63,16 +81,18 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
       try {
         const userSnap = await getDoc(doc(db, "users", user.uid));
-        const userData = userSnap.data();
+        const userData = userSnap.data() as Record<string, unknown> | undefined;
         const role = userData?.role;
 
-        if (!userSnap.exists() || !isAdminRole(role)) {
+        if (!userSnap.exists() || (role !== "admin" && role !== "tech_support")) {
           await signOut(auth);
           setLoading(false);
           router.replace("/");
           return;
         }
 
+        setDisplayName(getDisplayName(user, userData));
+        setRoleLabel(ROLE_LABELS[String(role)] ?? ROLE_LABELS.admin);
         setIsTechSupport(role === "tech_support");
         setLoading(false);
       } catch {
@@ -130,28 +150,25 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             <div className="grid h-14 w-14 place-items-center rounded-full bg-[#dc2626] text-white">
               <Users className="h-7 w-7" />
             </div>
-            <div>
-              <div className="text-lg font-bold text-[#e8c8c5]">Tên nhân viên</div>
-              <div className="text-sm text-[#8f7170]">Quản trị viên</div>
+            <div className="min-w-0">
+              <div className="truncate text-lg font-bold text-[#e8c8c5]" title={displayName}>
+                {displayName}
+              </div>
+              <div className="text-sm text-[#8f7170]">{roleLabel}</div>
             </div>
           </div>
-          <div className="mt-4 flex gap-3">
-            <button
-              type="button"
-              onClick={async () => {
-                await signOut(auth);
-                router.replace("/");
-              }}
-              className="grid h-11 w-11 place-items-center rounded-2xl bg-[#dc2626] text-white transition hover:bg-[#b91c1c]"
-              aria-label="Đăng xuất"
-            >
-              <LogOut className="h-5 w-5" />
-            </button>
-            <button className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-[#dc2626] px-4 py-3 font-semibold text-white transition hover:bg-[#b91c1c]">
-              <ChevronRight className="h-4 w-4 rotate-180" />
-              Cá nhân
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={async () => {
+              await signOut(auth);
+              router.replace("/");
+            }}
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#dc2626] px-4 py-3 font-semibold text-white transition hover:bg-[#b91c1c]"
+            aria-label="Đăng xuất"
+          >
+            <LogOut className="h-5 w-5" />
+            Đăng xuất
+          </button>
         </div>
       </aside>
 

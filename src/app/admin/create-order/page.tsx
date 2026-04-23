@@ -4,17 +4,16 @@ import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
-  Building2,
+  Building,
   ChevronDown,
   Minus,
   Plus,
   Search,
   ShoppingBag,
-  ShoppingCart,
   Sparkles,
-  Trash2,
+  Trash,
   Truck,
-  User2,
+  User,
   X,
 } from "lucide-react";
 import { addDoc, collection, onSnapshot, serverTimestamp } from "firebase/firestore";
@@ -199,7 +198,7 @@ export default function AdminCreateOrderPage() {
               </div>
               <h1 className="text-2xl font-extrabold tracking-tight lg:text-4xl">Tạo đơn hàng</h1>
               <p className="max-w-2xl text-sm text-[#8b6d67] lg:text-base">
-                Chọn món từ Firestore, quản lý giỏ hàng và tạo đơn hàng trực tiếp lên Firebase.
+                Quản lý giỏ hàng
               </p>
             </div>
 
@@ -319,7 +318,7 @@ export default function AdminCreateOrderPage() {
           <aside className="hidden space-y-6 lg:block lg:sticky lg:top-6 lg:self-start">
             <section className="rounded-[28px] bg-white p-5 shadow-[0_10px_30px_rgba(17,24,39,0.05)] ring-1 ring-black/5">
               <div className="mb-4 flex items-center gap-2">
-                <User2 className="h-5 w-5 text-[#c62828]" />
+                <User className="h-5 w-5 text-[#c62828]" />
                 <h2 className="text-xl font-bold">Thông tin khách hàng</h2>
               </div>
 
@@ -346,7 +345,7 @@ export default function AdminCreateOrderPage() {
             <section className="rounded-[28px] bg-white p-5 shadow-[0_10px_30px_rgba(17,24,39,0.05)] ring-1 ring-black/5">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
-                  <ShoppingCart className="h-5 w-5 text-[#c62828]" />
+                  <ShoppingBag className="h-5 w-5 text-[#c62828]" />
                   <h2 className="text-xl font-bold">Giỏ hàng</h2>
                 </div>
                 <span className="rounded-full bg-[#fff7f5] px-3 py-1 text-xs font-semibold text-[#b4534c]">{totalItems} món</span>
@@ -371,7 +370,7 @@ export default function AdminCreateOrderPage() {
                               <p className="text-sm text-[#8b6d67]">{formatCurrency(item.price)}</p>
                             </div>
                             <button type="button" onClick={() => removeItem(item.id)} className="rounded-full p-1.5 text-[#9d807a] transition hover:bg-[#fff1f0] hover:text-[#c62828]" aria-label={`Xóa ${item.name}`}>
-                              <Trash2 className="h-4 w-4" />
+                              <Trash className="h-4 w-4" />
                             </button>
                           </div>
 
@@ -420,7 +419,7 @@ export default function AdminCreateOrderPage() {
                   </div>
                 </label>
                 <div className="flex items-start gap-2 rounded-2xl bg-white px-3 py-3 text-xs text-[#8b6d67] ring-1 ring-[#f2e5e2]">
-                  <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-[#c62828]" />
+                  <Building className="mt-0.5 h-4 w-4 shrink-0 text-[#c62828]" />
                   <p>Admin có thể gán đơn trực tiếp cho shipper hoặc chi nhánh để điều phối xử lý nhanh hơn.</p>
                 </div>
               </div>
@@ -465,7 +464,7 @@ export default function AdminCreateOrderPage() {
             <div className="mx-auto mb-4 h-1.5 w-14 rounded-full bg-[#eadedb]" />
             <div className="mb-4 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <ShoppingCart className="h-5 w-5 text-[#c62828]" />
+                <ShoppingBag className="h-5 w-5 text-[#c62828]" />
                 <h2 className="text-lg font-bold text-[#2b1715]">Giỏ hàng & thanh toán</h2>
               </div>
               <button type="button" onClick={() => setDrawerOpen(false)} className="rounded-full p-2 text-[#7d625d] transition hover:bg-[#fff1f0]" aria-label="Đóng">
@@ -475,7 +474,7 @@ export default function AdminCreateOrderPage() {
 
             <section className="space-y-3 rounded-[24px] bg-white p-4 ring-1 ring-[#f4e9e7]">
               <div className="flex items-center gap-2">
-                <User2 className="h-5 w-5 text-[#c62828]" />
+                <User className="h-5 w-5 text-[#c62828]" />
                 <h3 className="text-base font-bold text-[#2b1715]">Thông tin khách hàng</h3>
               </div>
               <input value={customer.name} onChange={(event) => updateCustomer("name", event.target.value)} placeholder="Tên khách hàng" className="h-12 rounded-2xl border border-[#eadedb] bg-[#fffaf9] px-4 text-sm outline-none transition placeholder:text-[#b99f99] focus:border-[#c62828]" />
@@ -518,7 +517,7 @@ export default function AdminCreateOrderPage() {
                             <p className="text-sm text-[#8b6d67]">{formatCurrency(item.price)}</p>
                           </div>
                           <button type="button" onClick={() => removeItem(item.id)} className="rounded-full p-1.5 text-[#9d807a] transition hover:bg-[#fff1f0] hover:text-[#c62828]" aria-label={`Xóa ${item.name}`}>
-                            <Trash2 className="h-4 w-4" />
+                            <Trash className="h-4 w-4" />
                           </button>
                         </div>
 

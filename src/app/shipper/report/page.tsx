@@ -5,7 +5,7 @@ import {
   ArrowUpRight,
   CalendarDays,
   CheckCircle2,
-  Clock3,
+  Clock,
   Filter,
   Search,
   SquareDashedMousePointer,
@@ -97,7 +97,7 @@ function MobileCard({ record }: { record: DeliveryRecord }) {
       <div className="mt-4 grid gap-3 rounded-[18px] bg-[#fff8f6] p-4 ring-1 ring-[#f5e6e2]">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-sm text-[#8a6d68]">
-            <Clock3 className="h-4 w-4 text-[#dc2626]" />
+            <Clock className="h-4 w-4 text-[#dc2626]" />
             Thời gian
           </div>
           <p className="text-right text-sm font-semibold text-[#4f342f]">{record.deliveredAt}</p>

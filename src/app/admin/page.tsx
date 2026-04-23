@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Banknote, Clock3, LineChart, Package, ShoppingCart, Users } from "lucide-react";
+import { Banknote, Clock, LineChart, Package, ShoppingCart, Users } from "lucide-react";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "@/app/lib/firebase";
 
@@ -311,14 +311,14 @@ export default function AdminDashboardPage() {
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
             <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#b4534c]">Chào buổi sáng</p>
-            <h1 className="mt-3 text-[2.2rem] font-black tracking-tight text-[#2b1814] lg:text-[4rem]">Dashboard quản trị</h1>
+            <h1 className="mt-3 text-[2.2rem] font-black tracking-tight text-[#2b1814] lg:text-[4rem]">Trang chủ</h1>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-[#8f6f68] lg:text-[1rem]">
-              Dữ liệu đang được đồng bộ theo thời gian thực từ Firebase để bạn theo dõi doanh thu, đơn hàng và vận hành nhanh hơn.
+              Báo cáo tổng quan
             </p>
           </div>
 
           <div className="inline-flex items-center justify-center gap-2 self-start rounded-full bg-gradient-to-r from-[#b91c1c] to-[#dc2626] px-6 py-3 text-sm font-bold text-white shadow-[0_18px_30px_rgba(185,28,28,0.22)]">
-            <Clock3 className="h-4 w-4" />
+            <Clock className="h-4 w-4" />
             Realtime Dashboard
           </div>
         </div>
@@ -335,7 +335,7 @@ export default function AdminDashboardPage() {
           <div className="mb-5 flex items-center justify-between gap-3">
             <div>
               <h2 className="text-[1.05rem] font-extrabold text-[#2f1f1b] lg:text-[1.15rem]">Tổng quan nhanh</h2>
-              <p className="mt-1 text-sm text-[#9a7d77]">Cập nhật từ Firebase</p>
+              <p className="mt-1 text-sm text-[#9a7d77]">Đơn hàng</p>
             </div>
             <span className="rounded-full bg-[#fff4f3] px-3 py-1 text-xs font-bold text-[#c62828]">Live</span>
           </div>

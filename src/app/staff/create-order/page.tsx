@@ -15,7 +15,7 @@ import {
 import {
   ArrowLeft,
   ChevronDown,
-  Clock3,
+  Clock,
   FileText,
   Minus,
   Plus,
@@ -229,7 +229,7 @@ export default function StaffCreateOrderPage() {
                 <p className="mt-1 text-sm text-[#8b6d67]">Danh sách món ăn được lấy trực tiếp từ Firestore collection `menu`.</p>
               </div>
               <div className="hidden items-center gap-2 rounded-full bg-[#fff7f5] px-3 py-2 text-xs font-medium text-[#8b6d67] md:flex">
-                <Clock3 className="h-4 w-4 text-[#c62828]" />
+                <Clock className="h-4 w-4 text-[#c62828]" />
                 Realtime update
               </div>
             </div>

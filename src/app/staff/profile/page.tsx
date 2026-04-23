@@ -1,8 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState } from "react";
-import { Camera, Check, Edit3, Mail, Phone, User2 } from "lucide-react";
+import { useState } from "react";
+import { Camera, Check, Edit, Mail, Phone, User2 } from "lucide-react";
 
 type ProfileForm = {
   fullName: string;
@@ -22,15 +22,6 @@ export default function CtvProfilePage() {
   const [form, setForm] = useState<ProfileForm>(initialProfile);
   const [isEditing, setIsEditing] = useState(false);
 
-  const avatarName = useMemo(() => {
-    return form.fullName
-      .split(" ")
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part[0])
-      .join("")
-      .toUpperCase();
-  }, [form.fullName]);
 
   const handleChange = (field: keyof ProfileForm, value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -58,7 +49,7 @@ export default function CtvProfilePage() {
               onClick={() => setIsEditing((current) => !current)}
               className="inline-flex shrink-0 items-center gap-2 rounded-full bg-[#c62828] px-4 py-2.5 text-sm font-bold text-white shadow-[0_8px_22px_rgba(198,40,40,0.25)] transition active:scale-[0.99]"
             >
-              <Edit3 className="h-4 w-4" />
+              <Edit className="h-4 w-4" />
               Chỉnh sửa
             </button>
           </div>

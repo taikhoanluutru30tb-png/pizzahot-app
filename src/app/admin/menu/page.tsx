@@ -18,7 +18,6 @@ import {
   ChefHat,
   Edit3,
   Filter,
-  LucideIcon,
   Plus,
   Search,
   Trash2,
@@ -61,7 +60,7 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
-function ActionButton({ icon: Icon, label, tone = "neutral", onClick }: { icon: LucideIcon; label: string; tone?: "neutral" | "danger"; onClick: () => void }) {
+function ActionButton({ icon: Icon, label, tone = "neutral", onClick }: { icon: React.ComponentType<{ className?: string }>; label: string; tone?: "neutral" | "danger"; onClick: () => void }) {
   return (
     <button
       type="button"
@@ -123,10 +122,10 @@ export default function AdminMenuPage() {
   }, [items]);
 
   useEffect(() => {
-    if (!categories.includes(activeCategory)) {
+    if (categories.length > 0 && !categories.includes(activeCategory)) {
       setActiveCategory("Tất cả");
     }
-  }, [activeCategory, categories]);
+  }, [categories]);
 
   const filteredItems = useMemo(() => {
     const queryText = search.trim().toLowerCase();
@@ -236,9 +235,9 @@ export default function AdminMenuPage() {
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div className="max-w-2xl">
             <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#b28b84]">Quản lý thực đơn</p>
-            <h1 className="mt-2 text-[clamp(1.7rem,4vw,2.6rem)] font-black tracking-tight text-[#241614]">Menu Management</h1>
+            <h1 className="mt-2 text-[clamp(1.7rem,4vw,2.6rem)] font-black tracking-tight text-[#241614]">Quản lý menu</h1>
             <p className="mt-2 text-sm text-[#9b7d78] lg:text-base">
-              CRUD realtime với Firestore collection <span className="font-semibold text-[#6f5752]">menu</span>. Danh sách tự động cập nhật bằng <span className="font-semibold text-[#6f5752]">onSnapshot</span>.
+              Danh sách tự động cập nhật
             </p>
           </div>
 
@@ -269,7 +268,7 @@ export default function AdminMenuPage() {
               <UtensilsCrossed className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-lg font-extrabold text-[#251714]">Danh sách món ăn</h2>
+              <h2 className="text-lg font-extrabold text-[#251714]">Danh sách thực đơn</h2>
               <p className="text-sm text-[#9d7f79]">{filteredItems.length} món được hiển thị</p>
             </div>
           </div>

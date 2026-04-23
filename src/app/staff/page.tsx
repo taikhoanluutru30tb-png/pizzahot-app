@@ -5,19 +5,20 @@ import type { FormEvent } from "react";
 import {
   addDoc,
   collection,
+  doc,
   onSnapshot,
   orderBy,
   query,
   updateDoc,
 } from "firebase/firestore";
 import {
-  CheckCircle2,
-  Clock3,
+  CheckCircle,
   LogIn,
   LogOut,
-  MapPin,
   ShieldCheck,
-  SunMedium,
+  Sun,
+  Clock,
+  MapPin,
   TimerReset,
 } from "lucide-react";
 
@@ -94,7 +95,7 @@ export default function StaffAttendancePage() {
     setMessage(null);
 
     if (hasCheckedInToday) {
-      setError("Hôm nay bạn đã check-in rồi.");
+      setError("Trong ngày bạn đã vào ca rồi.");
       return;
     }
 
@@ -104,9 +105,9 @@ export default function StaffAttendancePage() {
         ngay: today,
         gio_bat_dau: liveClock,
       });
-      setMessage("Check-in thành công.");
+      setMessage("Vào ca thành công.");
     } catch (checkInError) {
-      setError(checkInError instanceof Error ? checkInError.message : "Không thể check-in.");
+      setError(checkInError instanceof Error ? checkInError.message : "Không thể vào ca.");
     }
   }
 
@@ -116,22 +117,22 @@ export default function StaffAttendancePage() {
     setMessage(null);
 
     if (!todayRecord?.gio_bat_dau) {
-      setError("Bạn cần check-in trước khi check-out.");
+      setError("Bạn cần vào ca trước khi kết ca.");
       return;
     }
 
     if (todayRecord.gio_ket_thuc) {
-      setError("Hôm nay bạn đã check-out rồi.");
+      setError("Hôm nay bạn đã kết ca rồi.");
       return;
     }
 
     try {
-      await updateDoc({ id: todayRecord.id } as never, {
+      await updateDoc(doc(db, "timekeeping", todayRecord.id), {
         gio_ket_thuc: liveClock,
       });
-      setMessage("Check-out thành công.");
+      setMessage("Kết ca thành công.");
     } catch (checkOutError) {
-      setError(checkOutError instanceof Error ? checkOutError.message : "Không thể check-out.");
+      setError(checkOutError instanceof Error ? checkOutError.message : "Không thể kết ca.");
     }
   }
 
@@ -145,8 +146,8 @@ export default function StaffAttendancePage() {
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.28em] text-white/90">
-              <Clock3 className="h-3.5 w-3.5" />
-              Thời gian hiện tại
+              <Clock className="h-3.5 w-3.5" />
+              Giờ hiện tại
             </div>
             <h1 className="text-5xl font-black tracking-tight sm:text-6xl">{liveClock}</h1>
             <p className="mt-3 text-sm font-medium text-white/90 sm:text-base">{todayLabel}</p>
@@ -161,16 +162,20 @@ export default function StaffAttendancePage() {
       {error ? <div className="rounded-2xl border border-[#f2d1d1] bg-[#fff7f7] px-4 py-3 text-sm font-medium text-[#b42318]">{error}</div> : null}
       {message ? <div className="rounded-2xl border border-[#d9f0df] bg-[#f3fbf5] px-4 py-3 text-sm font-medium text-[#1f7a39]">{message}</div> : null}
 
-      <section>
-        <div className="mb-4 flex items-center gap-3">
-          <h2 className="text-2xl font-bold text-[#3f2f2c]">Chấm công</h2>
-          <span className="inline-flex items-center gap-1 rounded-full bg-[#fff1f0] px-3 py-1 text-xs font-semibold text-[#dc2626] ring-1 ring-[#fecaca]">
+      <section className="rounded-[28px] border border-[#efe2df] bg-white p-4 shadow-[0_12px_40px_rgba(17,24,39,0.06)] sm:p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#b08d85]">Theo dõi ca làm</p>
+            <h2 className="mt-2 text-[1.7rem] font-black tracking-tight text-[#231714] sm:text-[2rem]">Nhật ký trong ngày</h2>
+            <p className="mt-2 text-sm leading-6 text-[#9f827c]">Ghi nhận thời gian bắt đầu và kết thúc ca làm trong ngày hôm nay.</p>
+          </div>
+          <span className="inline-flex items-center gap-1 rounded-full bg-[#fff1f0] px-3 py-2 text-xs font-semibold text-[#dc2626] ring-1 ring-[#fecaca]">
             <ShieldCheck className="h-3.5 w-3.5" />
-            Hôm nay
+            Trong ngày
           </span>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 sm:gap-4">
           <button
             type="button"
             onClick={handleCheckIn}
@@ -181,8 +186,8 @@ export default function StaffAttendancePage() {
               <LogIn className="h-7 w-7 sm:h-8 sm:w-8" />
             </span>
             <span className="text-center">
-              <span className="block text-xs font-bold uppercase tracking-[0.24em] text-white/75">Xác nhận</span>
-              <span className="mt-1 block text-2xl font-black sm:text-3xl">Check-in</span>
+              <span className="block text-xs font-bold uppercase tracking-[0.24em] text-white/75">Bắt đầu ca</span>
+              <span className="mt-1 block text-2xl font-black sm:text-3xl">Vào ca</span>
             </span>
           </button>
 
@@ -196,8 +201,8 @@ export default function StaffAttendancePage() {
               <LogOut className="h-7 w-7 sm:h-8 sm:w-8" />
             </span>
             <span className="text-center">
-              <span className="block text-xs font-bold uppercase tracking-[0.24em] text-[#a18a86]">Kết thúc</span>
-              <span className="mt-1 block text-2xl font-black sm:text-3xl">Check-out</span>
+              <span className="block text-xs font-bold uppercase tracking-[0.24em] text-[#a18a86]">Kết thúc ca</span>
+              <span className="mt-1 block text-2xl font-black sm:text-3xl">Kết ca</span>
             </span>
           </button>
         </div>
@@ -207,11 +212,11 @@ export default function StaffAttendancePage() {
         <div className="mb-5 flex items-center justify-between gap-4">
           <div>
             <h2 className="text-xl font-bold text-[#3f2f2c] sm:text-2xl">Lịch sử chấm công</h2>
-            <p className="mt-1 text-sm text-[#8a6d68]">Các lần check-in / check-out được lắng nghe realtime từ Firestore</p>
+            <p className="mt-1 text-sm text-[#8a6d68]">Các lần vào ca và kết ca trong những ngày gần đây</p>
           </div>
           <div className="hidden items-center gap-2 rounded-full bg-[#fff7f5] px-3 py-2 text-xs font-medium text-[#8a6d68] sm:flex">
             <MapPin className="h-4 w-4 text-[#dc2626]" />
-            Nhân viên: {STAFF_UID}
+            Mã nhân sự: {STAFF_UID}
           </div>
         </div>
 
@@ -228,17 +233,17 @@ export default function StaffAttendancePage() {
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                     <h3 className="text-base font-bold text-[#3f2f2c]">{record.ngay}</h3>
                     <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[#8a6d68] ring-1 ring-[#eadedb]">
-                      <Clock3 className="h-3.5 w-3.5" />
+                      <Clock className="h-3.5 w-3.5" />
                       Vào: {record.gio_bat_dau ?? "---"}
                     </span>
                     <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[#8a6d68] ring-1 ring-[#eadedb]">
-                      <Clock3 className="h-3.5 w-3.5" />
+                      <Clock className="h-3.5 w-3.5" />
                       Ra: {record.gio_ket_thuc ?? "---"}
                     </span>
                   </div>
                 </div>
 
-                <CheckCircle2 className={`h-5 w-5 shrink-0 ${isCheckedIn ? "text-[#16a34a]" : "text-[#dc2626]"}`} />
+                <CheckCircle className={`h-5 w-5 shrink-0 ${isCheckedIn ? "text-[#16a34a]" : "text-[#dc2626]"}`} />
               </article>
             );
           })}
@@ -248,10 +253,10 @@ export default function StaffAttendancePage() {
       <section className="grid gap-3 sm:grid-cols-2">
         <div className="rounded-[24px] border-l-4 border-l-[#dc2626] bg-white p-4 shadow-[0_10px_30px_rgba(17,24,39,0.05)] ring-1 ring-[#f4e9e7]">
           <div className="flex items-center gap-3 text-sm font-semibold uppercase tracking-[0.24em] text-[#8a6d68]">
-            <SunMedium className="h-4 w-4 text-[#dc2626]" />
+            <Sun className="h-4 w-4 text-[#dc2626]" />
             Ca làm hiện tại
           </div>
-          <p className="mt-3 text-xl font-black text-[#3f2f2c]">Ca chiều (Chính thức)</p>
+          <p className="mt-3 text-xl font-black text-[#3f2f2c]">Ca chiều chính thức</p>
           <p className="mt-2 text-sm text-[#8a6d68]">14:00 - 22:00</p>
         </div>
 
@@ -260,7 +265,7 @@ export default function StaffAttendancePage() {
             <ShieldCheck className="h-4 w-4 text-[#f59e0b]" />
             Trạng thái
           </div>
-          <p className="mt-3 text-xl font-black text-[#3f2f2c]">Sẵn sàng chấm công</p>
+          <p className="mt-3 text-xl font-black text-[#3f2f2c]">Sẵn sàng làm việc</p>
           <p className="mt-2 text-sm text-[#8a6d68]">Nút lớn, dễ bấm trên mobile</p>
         </div>
       </section>

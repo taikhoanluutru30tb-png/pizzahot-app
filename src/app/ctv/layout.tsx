@@ -19,8 +19,6 @@ import {
 } from "lucide-react";
 import { auth, db } from "../lib/firebase";
 
-type CtvRole = "ctv" | "tech_support";
-
 type NavItem = {
   label: string;
   href: string;
@@ -35,15 +33,31 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Hồ sơ", href: "/ctv/profile", icon: UserRoundPen },
 ];
 
-function isCtvRole(role: unknown): role is CtvRole {
-  return role === "ctv" || role === "tech_support";
+const ROLE_LABELS: Record<string, string> = {
+  ctv: "CTV",
+  tech_support: "Hỗ trợ kỹ thuật",
+};
+
+function getDisplayName(user: User, userData: Record<string, unknown> | undefined) {
+  const candidates = [
+    userData?.fullName,
+    userData?.displayName,
+    userData?.name,
+    user.displayName,
+    user.email,
+  ];
+
+  const found = candidates.find((value): value is string => typeof value === "string" && value.trim().length > 0);
+  return found ?? "Tài khoản đăng nhập";
 }
+
 
 export default function CtvLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [loading, setLoading] = useState(true);
-  const [displayName, setDisplayName] = useState("Tên nhân viên");
+  const [displayName, setDisplayName] = useState("Tài khoản đăng nhập");
+  const [roleLabel, setRoleLabel] = useState(ROLE_LABELS.ctv);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
@@ -55,23 +69,18 @@ export default function CtvLayout({ children }: { children: ReactNode }) {
 
       try {
         const userSnap = await getDoc(doc(db, "users", user.uid));
-        const userData = userSnap.data();
+        const userData = userSnap.data() as Record<string, unknown> | undefined;
         const role = userData?.role;
 
-        if (!userSnap.exists() || !isCtvRole(role)) {
+        if (!userSnap.exists() || (role !== "ctv" && role !== "tech_support")) {
           await signOut(auth);
           setLoading(false);
           router.replace("/");
           return;
         }
 
-        const profileName =
-          (userSnap.data()?.displayName as string | undefined) ||
-          user.displayName ||
-          user.email?.split("@")[0] ||
-          "CTV";
-
-        setDisplayName(profileName);
+        setDisplayName(getDisplayName(user, userData));
+        setRoleLabel(ROLE_LABELS[String(role)] ?? ROLE_LABELS.ctv);
         setLoading(false);
       } catch {
         await signOut(auth);
@@ -134,9 +143,11 @@ export default function CtvLayout({ children }: { children: ReactNode }) {
                 className="h-full w-full object-cover"
               />
             </div>
-            <div>
-              <div className="text-lg font-bold text-[#f0cec9]">{displayName}</div>
-              <div className="text-sm text-[#9f817d]">CTV</div>
+            <div className="min-w-0">
+              <div className="truncate text-lg font-bold text-[#f0cec9]" title={displayName}>
+                {displayName}
+              </div>
+              <div className="text-sm text-[#9f817d]">{roleLabel}</div>
             </div>
           </div>
           <div className="mt-4 flex gap-3">
@@ -203,6 +214,19 @@ export default function CtvLayout({ children }: { children: ReactNode }) {
               </Link>
             );
           })}
+
+          <button
+            type="button"
+            onClick={async () => {
+              await signOut(auth);
+              router.replace("/");
+            }}
+            className="flex min-w-[78px] flex-col items-center justify-center rounded-2xl px-2 py-2 text-[11px] font-medium text-[#7f625d] transition hover:bg-[#f6ebe9]"
+            aria-label="Đăng xuất"
+          >
+            <LogOut className="mb-1 h-5 w-5" />
+            <span className="truncate">Đăng xuất</span>
+          </button>
         </div>
       </nav>
     </div>

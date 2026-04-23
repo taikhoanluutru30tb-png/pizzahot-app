@@ -111,11 +111,6 @@ function toDate(value?: FirestoreOrder["thoi_gian_tao"]) {
   return null;
 }
 
-function getTimestampMs(value?: FirestoreOrder["thoi_gian_tao"]) {
-  const date = toDate(value);
-  return date ? date.getTime() : 0;
-}
-
 function getOrderStatus(order: FirestoreOrder) {
   return order.trang_thai || order.status || "Đang xử lý";
 }
@@ -271,10 +266,10 @@ export default function AdminReportPage() {
           <div className="max-w-3xl">
             <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#b28b84]">Báo cáo chuyên sâu</p>
             <h1 className="mt-2 text-[clamp(2rem,4vw,3.2rem)] font-black tracking-tight text-[#241614]">
-              Dashboard báo cáo Firestore
+              Báo cáo chi tiết
             </h1>
             <p className="mt-3 text-sm leading-7 text-[#9b7d78] lg:text-base">
-              Dữ liệu đồng bộ realtime từ collection <span className="font-semibold text-[#7f625e]">orders</span>, bao gồm doanh thu, tỷ lệ thành công, món bán chạy và bảng đơn hoàn thành gần đây.
+              Báo cáo doanh thu, tỷ lệ thành công, món bán chạy và bảng đơn hoàn thành gần đây.
             </p>
           </div>
 

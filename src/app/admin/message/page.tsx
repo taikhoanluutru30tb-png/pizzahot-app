@@ -42,7 +42,7 @@ const conversations: Conversation[] = [
   {
     id: "team-sales",
     name: "Quản lý - Nhân viên",
-    role: "Kênh chung",
+    role: "Tất cả hội thoại",
     lastMessage: "Đã cập nhật lịch giao cho ca tối.",
     time: "08:42",
     unread: 3,
@@ -288,7 +288,7 @@ export default function CtvMessagePage() {
                       <div className="flex flex-col items-end gap-2">
                         <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${conversation.online ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" : "bg-[#f6f0ee] text-[#8d726b] ring-1 ring-[#eadfdb]"}`}>
                           <span className={`h-2 w-2 rounded-full ${conversation.online ? "bg-emerald-500" : "bg-[#b8a09a]"}`} />
-                          {conversation.online ? "Online" : "Offline"}
+                          {conversation.online ? "Đang hoạt động" : "Không hoạt động"}
                         </span>
                         {conversation.unread > 0 && (
                           <span className="inline-flex min-h-6 min-w-6 items-center justify-center rounded-full bg-[#c62828] px-2 text-xs font-bold text-white">
@@ -326,9 +326,9 @@ export default function CtvMessagePage() {
               </div>
 
               <div className="flex items-center gap-1 sm:gap-2">
-                <IconButton label="Gọi thoại" icon={Phone} />
-                <IconButton label="Gọi video" icon={Video} />
-                <IconButton label="Thêm" icon={MoreVertical} />
+                <IconButton label="Gọi điện" icon={Phone} />
+                <IconButton label="Gọi hình" icon={Video} />
+                <IconButton label="Tùy chọn" icon={MoreVertical} />
               </div>
             </div>
           </header>
@@ -363,7 +363,7 @@ export default function CtvMessagePage() {
                     <input
                       value={draft}
                       onChange={(event) => setDraft(event.target.value)}
-                      placeholder="Nhắn tin..."
+                      placeholder="Nhập nội dung..."
                       className="w-full bg-transparent text-sm font-medium text-[#4d3b37] outline-none placeholder:text-[#bea9a4]"
                     />
                   </label>
@@ -374,7 +374,7 @@ export default function CtvMessagePage() {
                   className="inline-flex h-12 min-w-12 items-center justify-center rounded-[18px] bg-[#c62828] px-4 text-white shadow-[0_14px_28px_rgba(198,40,40,0.24)] transition hover:bg-[#a91f1f] active:scale-[0.98]"
                 >
                   <Send className="h-5 w-5" />
-                  <span className="ml-2 hidden text-sm font-extrabold sm:inline">Send</span>
+                  <span className="ml-2 hidden text-sm font-extrabold sm:inline">Gửi</span>
                 </button>
               </div>
             </div>

@@ -10,8 +10,8 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import {
-  CircleCheckBig,
-  Clock3,
+  CheckCircle,
+  Clock,
   Filter,
   MapPin,
   Search,
@@ -99,13 +99,20 @@ export default function AdminDeliveryPage() {
     });
   }, [onlyAvailable, search, shippers]);
 
-  const selectedOrder = waitingOrders.find((order) => order.id === selectedOrderId) ?? waitingOrders[0] ?? null;
-  const selectedShipper = visibleShippers.find((shipper) => shipper.id === selectedShipperId) ?? visibleShippers[0] ?? null;
+  const selectedOrder = useMemo(
+    () => waitingOrders.find((order) => order.id === selectedOrderId) ?? waitingOrders[0] ?? null,
+    [selectedOrderId, waitingOrders]
+  );
+  const selectedShipper = useMemo(
+    () => visibleShippers.find((shipper) => shipper.id === selectedShipperId) ?? visibleShippers[0] ?? null,
+    [selectedShipperId, visibleShippers]
+  );
 
   useEffect(() => {
-    if (!selectedOrderId && waitingOrders[0]) setSelectedOrderId(waitingOrders[0].id);
-    if (!selectedShipperId && visibleShippers[0]) setSelectedShipperId(visibleShippers[0].id);
-  }, [selectedOrderId, selectedShipperId, visibleShippers, waitingOrders]);
+    if (!selectedOrderId && waitingOrders[0]) {
+      setSelectedOrderId(waitingOrders[0].id);
+    }
+  }, [selectedOrderId, waitingOrders]);
 
   async function handleAssign() {
     setError(null);
@@ -137,15 +144,15 @@ export default function AdminDeliveryPage() {
         <div className="flex flex-col gap-4">
           <div className="space-y-2">
             <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#b18a83]">Điều phối giao hàng</p>
-            <h1 className="text-[1.7rem] font-black tracking-tight text-[#241615] sm:text-[2rem] lg:text-[2.35rem]">Delivery Coordination</h1>
+            <h1 className="text-[1.7rem] font-black tracking-tight text-[#241615] sm:text-[2rem] lg:text-[2.35rem]">Điều phối giao hàng</h1>
             <p className="max-w-3xl text-sm leading-6 text-[#9a7d77] sm:text-base">
-              Lọc đơn ở trạng thái <span className="font-semibold text-[#6f5752]">Chờ giao</span> hoặc <span className="font-semibold text-[#6f5752]">Đang nấu</span> và điều phối shipper bằng Firestore realtime.
+              Lọc đơn ở trạng thái Chờ giao hoặc Đang nấu và điều phối shipper.
             </p>
           </div>
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {[
-              { label: "Đơn chờ giao", value: waitingOrders.length, icon: Clock3 },
+              { label: "Đơn chờ giao", value: waitingOrders.length, icon: Clock },
               { label: "Shipper rảnh", value: shippers.filter((s) => s.isAvailable !== false).length, icon: Users },
               { label: "Đang online", value: shippers.length, icon: Smartphone },
               { label: "Sẵn sàng", value: shippers.filter((s) => s.isAvailable !== false).length, icon: ShieldCheck },
@@ -185,9 +192,9 @@ export default function AdminDeliveryPage() {
                     <div className="min-w-0 space-y-2">
                       <div className="flex flex-wrap items-center gap-2"><p className="text-sm font-bold text-[#c62828]">Mã: {order.id}</p><span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200">{getStatusLabel(order.trang_thai)}</span></div>
                       <h3 className="truncate text-[1.05rem] font-extrabold tracking-tight text-[#2a1d1a] sm:text-[1.1rem]">{order.khach_hang?.ten ?? "Khách hàng"}</h3>
-                      <div className="flex flex-col gap-1 text-sm text-[#9f827c] sm:flex-row sm:items-center sm:gap-4"><span className="inline-flex items-center gap-1.5"><MapPin className="h-4 w-4" />{order.khach_hang?.dia_chi ?? "Chưa có địa chỉ"}</span><span className="inline-flex items-center gap-1.5"><Clock3 className="h-4 w-4" />{order.thoi_gian_tao?.toDate ? order.thoi_gian_tao.toDate().toLocaleString("vi-VN") : "Chưa có thời gian"}</span></div>
+                      <div className="flex flex-col gap-1 text-sm text-[#9f827c] sm:flex-row sm:items-center sm:gap-4"><span className="inline-flex items-center gap-1.5"><MapPin className="h-4 w-4" />{order.khach_hang?.dia_chi ?? "Chưa có địa chỉ"}</span><span className="inline-flex items-center gap-1.5"><Clock className="h-4 w-4" />{order.thoi_gian_tao?.toDate ? order.thoi_gian_tao.toDate().toLocaleString("vi-VN") : "Chưa có thời gian"}</span></div>
                     </div>
-                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${active ? "bg-[#c62828] text-white" : "bg-[#f5efee] text-[#8f746f]"}`}><CircleCheckBig className="h-5 w-5" /></div>
+                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${active ? "bg-[#c62828] text-white" : "bg-[#f5efee] text-[#8f746f]"}`}><CheckCircle className="h-5 w-5" /></div>
                   </div>
                   <div className="mt-4 rounded-[18px] bg-[#faf7f6] px-4 py-3"><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#aa9089]">Ghi chú</p><p className="mt-1 text-sm text-[#6b5751]">{order.khach_hang?.ghi_chu || "Không có ghi chú"}</p></div>
                 </button>

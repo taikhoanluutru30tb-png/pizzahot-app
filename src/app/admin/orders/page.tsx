@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { LucideIcon } from "lucide-react";
+import type { ComponentType } from "react";
 import {
   ChevronDown,
-  CircleCheckBig,
+  CheckCircle,
   CircleX,
-  Clock3,
+  Clock,
   Eye,
   Filter,
   MoreVertical,
@@ -47,17 +47,17 @@ type Order = {
 type StatusMeta = {
   label: OrderStatus;
   className: string;
-  icon: LucideIcon;
+  icon: ComponentType<{ className?: string }>;
 };
 
 const statusOptions: OrderStatus[] = ["Chờ xử lý", "Đang nấu", "Đang giao", "Hoàn thành", "Đã hủy"];
 const filters: FilterKey[] = ["Tất cả", ...statusOptions];
 
 const statusMeta: Record<OrderStatus, StatusMeta> = {
-  "Chờ xử lý": { label: "Chờ xử lý", className: "bg-amber-50 text-amber-700 ring-1 ring-amber-200", icon: Clock3 },
+  "Chờ xử lý": { label: "Chờ xử lý", className: "bg-amber-50 text-amber-700 ring-1 ring-amber-200", icon: Clock },
   "Đang nấu": { label: "Đang nấu", className: "bg-sky-50 text-sky-700 ring-1 ring-sky-200", icon: UtensilsCrossed },
   "Đang giao": { label: "Đang giao", className: "bg-violet-50 text-violet-700 ring-1 ring-violet-200", icon: Truck },
-  "Hoàn thành": { label: "Hoàn thành", className: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200", icon: CircleCheckBig },
+  "Hoàn thành": { label: "Hoàn thành", className: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200", icon: CheckCircle },
   "Đã hủy": { label: "Đã hủy", className: "bg-rose-50 text-rose-700 ring-1 ring-rose-200", icon: CircleX },
 };
 
@@ -124,9 +124,9 @@ export default function AdminOrdersPage() {
         <div className="flex flex-col gap-4">
           <div className="space-y-2">
             <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#b18a83]">Quản lý đơn hàng</p>
-            <h1 className="text-[1.7rem] font-black tracking-tight text-[#241615] sm:text-[2rem] lg:text-[2.35rem]">Danh sách đơn hàng realtime</h1>
+            <h1 className="text-[1.7rem] font-black tracking-tight text-[#241615] sm:text-[2rem] lg:text-[2.35rem]">Danh sách đơn hàng</h1>
             <p className="max-w-2xl text-sm leading-6 text-[#9a7d77] sm:text-base">
-              Đồng bộ trực tiếp từ Firestore collection <span className="font-semibold text-[#6f5752]">orders</span>, sắp xếp mới nhất lên đầu.
+              Dữ liệu cập nhật liên tục
             </p>
           </div>
 
@@ -208,7 +208,7 @@ export default function AdminOrdersPage() {
                       <div className="relative inline-block text-left">
                         <button type="button" onClick={() => setOpenMenuId((current) => (current === order.id ? null : order.id))} className="inline-flex items-center gap-2 rounded-xl border border-[#eadad5] bg-white px-3 py-2 text-sm font-semibold text-[#6f5752] transition hover:bg-[#faf6f5]">
                           <MoreVertical className="h-4 w-4" />
-                          Cập nhật
+                          Điều chỉnh
                         </button>
                         {openMenuId === order.id ? (
                           <div className="absolute right-0 top-full z-20 mt-2 w-48 overflow-hidden rounded-2xl border border-[#eadad5] bg-white shadow-[0_16px_36px_rgba(0,0,0,0.12)]">

@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import type { FormEvent } from "react";
+import { useEffect, useState } from "react";
 import {
   collection,
   doc,
@@ -20,7 +19,6 @@ import {
   Phone,
   Truck,
   UserRound,
-  X,
 } from "lucide-react";
 
 import { auth, db } from "@/app/lib/firebase";
@@ -225,11 +223,11 @@ export default function ShipperTransitPage() {
           <div>
             <div className="inline-flex items-center gap-2 rounded-full bg-[#fff1f0] px-3 py-1 text-xs font-bold uppercase tracking-[0.28em] text-[#dc2626] ring-1 ring-[#fecaca]">
               <Bell className="h-3.5 w-3.5" />
-              Shipper dashboard
+              Trang điều phối
             </div>
             <h1 className="mt-4 text-3xl font-black tracking-tight text-[#3f2f2c] sm:text-5xl">Đơn hàng đang giao</h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-[#7f625d] sm:text-base">
-              Danh sách đơn được lọc realtime từ Firestore. Khi bấm “Đã giao xong”, trạng thái sẽ chuyển sang Hoàn thành và đơn sẽ tự biến mất khỏi màn hình.
+              Danh sách đơn được lọc tự động. Khi bấm “Đã giao xong”, trạng thái sẽ chuyển sang Hoàn thành và đơn sẽ tự biến mất khỏi màn hình.
             </p>
           </div>
 

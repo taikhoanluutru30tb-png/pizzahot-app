@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { BellRing, BriefcaseBusiness, CalendarClock, Clock3, DollarSign, Gauge, Save, ShieldAlert, Smartphone } from "lucide-react";
+import { BellRing, BriefcaseBusiness, CalendarClock, Clock, DollarSign, Gauge, Save, ShieldAlert, Smartphone } from "lucide-react";
 
 type SettingCardProps = {
   icon: ReactNode;
@@ -36,20 +36,20 @@ export default function TimekeepingPage() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#b08d85]">Thiết lập chấm công</p>
-            <h1 className="mt-2 text-[1.9rem] font-black tracking-tight text-[#231714] lg:text-[2.5rem]">Cài đặt timekeeping cho nhân viên</h1>
+            <h1 className="mt-2 text-[1.9rem] font-black tracking-tight text-[#231714] lg:text-[2.5rem]">Cài đặt chấm công cho nhân viên</h1>
             <p className="mt-2 max-w-3xl text-sm text-[#9f827c] lg:text-base">
-              Thiết lập giờ vào ca, giờ tan ca, mức lương theo giờ và quy định đi muộn để hệ thống chấm công hoạt động chính xác.
+              Thiết lập giờ vào ca, giờ kết ca, mức lương theo giờ và quy định đi muộn để hệ thống ghi nhận chính xác.
             </p>
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row">
             <button className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#f0d3cf] bg-white px-4 py-3 text-sm font-bold text-[#7d4a45] transition hover:bg-[#fff4f2]">
               <ShieldAlert className="h-4 w-4" />
-              Khôi phục mặc định
+              Đưa về mặc định
             </button>
             <button className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#c62828] px-5 py-3 text-sm font-bold text-white shadow-[0_10px_24px_rgba(198,40,40,0.25)] transition hover:bg-[#a91f1f]">
               <Save className="h-4 w-4" />
-              Lưu cấu hình
+              Lưu thiết lập
             </button>
           </div>
         </div>
@@ -59,7 +59,7 @@ export default function TimekeepingPage() {
         <div className="xl:col-span-2">
           <div className="space-y-4 sm:space-y-5">
             <SettingCard
-              icon={<Clock3 className="h-5 w-5" />}
+              icon={<Clock className="h-5 w-5" />}
               title="Giờ làm việc"
               description="Thiết lập khung giờ chuẩn mà nhân viên phải có mặt để tính công trong ngày."
             >
@@ -97,9 +97,9 @@ export default function TimekeepingPage() {
                     <Gauge className="h-4 w-4" />
                   </div>
                   <div>
-                    <p className="font-bold text-[#2f1f1b]">Gợi ý cấu hình</p>
+                    <p className="font-bold text-[#2f1f1b]">Gợi ý thiết lập</p>
                     <p className="mt-1 text-sm leading-6 text-[#9a7d77]">
-                      Nên đặt cùng mốc giờ cho các chi nhánh nếu muốn báo cáo chấm công đồng bộ và dễ đối soát.
+                      Nên đặt cùng mốc giờ cho các chi nhánh nếu muốn dữ liệu chấm công đồng bộ và dễ đối soát.
                     </p>
                   </div>
                 </div>
@@ -109,7 +109,7 @@ export default function TimekeepingPage() {
             <SettingCard
               icon={<DollarSign className="h-5 w-5" />}
               title="Mức lương theo giờ"
-              description="Nhập đơn giá lương cơ bản để tính công và hỗ trợ xuất báo cáo lương tự động."
+              description="Nhập đơn giá lương cơ bản để tính công và hỗ trợ xuất bảng lương tự động."
             >
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
@@ -142,7 +142,7 @@ export default function TimekeepingPage() {
 
             <SettingCard
               icon={<BellRing className="h-5 w-5" />}
-              title="Quy định đi muộn"
+              title="Quy định trễ giờ"
               description="Thiết lập giới hạn thời gian trễ và cách xử lý khi nhân viên đến muộn."
             >
               <div className="grid gap-4 md:grid-cols-2">
@@ -158,7 +158,7 @@ export default function TimekeepingPage() {
                     />
                     <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-[#a88c86]">phút</span>
                   </div>
-                  <p className="mt-2 text-xs text-[#a88c86]">Sau thời gian này hệ thống sẽ đánh dấu đi muộn.</p>
+                  <p className="mt-2 text-xs text-[#a88c86]">Sau thời gian này hệ thống sẽ đánh dấu trễ giờ.</p>
                 </div>
 
                 <div>
@@ -175,7 +175,7 @@ export default function TimekeepingPage() {
 
               <div className="mt-4 grid gap-4 md:grid-cols-2">
                 <div>
-                  <FieldLabel>Mức phạt khi đi muộn</FieldLabel>
+                  <FieldLabel>Mức phạt khi trễ giờ</FieldLabel>
                   <div className="relative">
                     <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-base font-bold text-[#c46d5f]">₫</span>
                     <input
@@ -211,7 +211,7 @@ export default function TimekeepingPage() {
                 <BriefcaseBusiness className="h-5 w-5" />
               </div>
               <div>
-                <h2 className="text-lg font-extrabold text-[#2f1f1b]">Tóm tắt cấu hình</h2>
+                <h2 className="text-lg font-extrabold text-[#2f1f1b]">Tóm tắt thiết lập</h2>
                 <p className="mt-1 text-sm leading-6 text-[#9a7d77]">Xem nhanh các thông số đang được áp dụng cho hệ thống chấm công.</p>
               </div>
             </div>
@@ -238,7 +238,7 @@ export default function TimekeepingPage() {
               </div>
               <div>
                 <h2 className="text-lg font-extrabold text-[#2f1f1b]">Lưu ý vận hành</h2>
-                <p className="mt-1 text-sm leading-6 text-[#9a7d77]">Các thiết lập này sẽ ảnh hưởng trực tiếp đến dữ liệu chấm công và báo cáo lương.</p>
+                <p className="mt-1 text-sm leading-6 text-[#9a7d77]">Các thiết lập này sẽ ảnh hưởng trực tiếp đến dữ liệu ca làm và bảng lương.</p>
               </div>
             </div>
 

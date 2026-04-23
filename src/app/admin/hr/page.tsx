@@ -15,17 +15,16 @@ import {
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import {
   ArrowUpRight,
-  BriefcaseBusiness,
-  Edit3,
+  Edit,
   Filter,
-  LucideIcon,
   Plus,
   Search,
   ShieldCheck,
   Truck,
-  UserCog,
   Users,
   X,
+  Briefcase,
+  UserCog,
 } from "lucide-react";
 
 import { auth, db } from "@/app/lib/firebase";
@@ -51,13 +50,13 @@ type FormState = {
 type RoleMeta = {
   label: string;
   className: string;
-  icon: LucideIcon;
+  icon: typeof UserCog;
 };
 
 const roleMeta: Record<EmployeeRole, RoleMeta> = {
   Admin: { label: "admin", className: "bg-[#fff1f0] text-[#c62828] ring-1 ring-[#f4c6c0]", icon: UserCog },
   Staff: { label: "staff", className: "bg-[#edf8ee] text-[#1b7f3a] ring-1 ring-[#c7ead0]", icon: ShieldCheck },
-  CTV: { label: "ctv", className: "bg-[#f2eaff] text-[#7a3db8] ring-1 ring-[#dcc9f5]", icon: BriefcaseBusiness },
+  CTV: { label: "ctv", className: "bg-[#f2eaff] text-[#7a3db8] ring-1 ring-[#dcc9f5]", icon: Briefcase },
   Shipper: { label: "shipper", className: "bg-[#fff4e5] text-[#c96a00] ring-1 ring-[#f5d1a2]", icon: Truck },
 };
 
@@ -247,10 +246,10 @@ export default function AdminHrPage() {
         <div className="flex flex-col gap-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#b08d85]">Human Resources Management</p>
+              <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#b08d85]">Quản lý nhân sự</p>
               <h1 className="mt-2 text-[1.9rem] font-black tracking-tight text-[#231714] lg:text-[2.5rem]">Quản lý nhân sự</h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-[#9f827c] lg:text-base">
-                Dữ liệu nhân sự được đọc realtime từ Firestore collection <span className="font-semibold text-[#6f5752]">users</span>.
+                Dữ liệu nhân sự
               </p>
             </div>
 
@@ -271,7 +270,7 @@ export default function AdminHrPage() {
               { label: "Tổng nhân sự", value: stats.total, icon: Users, accent: "text-[#c62828]" },
               { label: "Admin", value: stats.Admin, icon: UserCog, accent: "text-[#c62828]" },
               { label: "Staff", value: stats.Staff, icon: ShieldCheck, accent: "text-[#1b7f3a]" },
-              { label: "CTV / Shipper", value: stats.CTV + stats.Shipper, icon: BriefcaseBusiness, accent: "text-[#7a3db8]" },
+              { label: "CTV / Shipper", value: stats.CTV + stats.Shipper, icon: Briefcase, accent: "text-[#7a3db8]" },
             ].map((item) => {
               const Icon = item.icon;
               return (
@@ -343,7 +342,7 @@ export default function AdminHrPage() {
                     <td className="px-5 py-4"><span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ${role.className}`}><RoleIcon className="h-3.5 w-3.5" />{role.label}</span></td>
                     <td className="px-5 py-4">
                       <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => openEditModal(employee)} className="inline-flex items-center gap-2 rounded-xl border border-[#eadbd7] bg-white px-3 py-2 text-sm font-bold text-[#4d3a35] transition hover:bg-[#fff7f5]"><Edit3 className="h-4 w-4 text-[#c62828]" />Sửa</button>
+                        <button onClick={() => openEditModal(employee)} className="inline-flex items-center gap-2 rounded-xl border border-[#eadbd7] bg-white px-3 py-2 text-sm font-bold text-[#4d3a35] transition hover:bg-[#fff7f5]"><Edit className="h-4 w-4 text-[#c62828]" />Sửa</button>
                         <button onClick={() => handleDelete(employee.id)} className="inline-flex items-center gap-2 rounded-xl bg-[#fff1f0] px-3 py-2 text-sm font-bold text-[#c62828] transition hover:bg-[#ffe5e2]">Xóa</button>
                       </div>
                     </td>
@@ -369,7 +368,7 @@ export default function AdminHrPage() {
                   <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ${role.className}`}><RoleIcon className="h-3.5 w-3.5" />{role.label}</span>
                 </div>
                 <div className="mt-4 flex gap-2">
-                  <button onClick={() => openEditModal(employee)} className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-[#eadbd7] bg-white px-3 py-2.5 text-sm font-bold text-[#4d3a35]"><Edit3 className="h-4 w-4 text-[#c62828]" />Sửa</button>
+                  <button onClick={() => openEditModal(employee)} className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-[#eadbd7] bg-white px-3 py-2.5 text-sm font-bold text-[#4d3a35]"><Edit className="h-4 w-4 text-[#c62828]" />Sửa</button>
                   <button onClick={() => handleDelete(employee.id)} className="inline-flex items-center justify-center rounded-xl bg-[#fff1f0] px-4 py-2.5 text-sm font-bold text-[#c62828]">Xóa</button>
                 </div>
               </article>

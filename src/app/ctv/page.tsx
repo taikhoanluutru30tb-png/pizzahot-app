@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot, orderBy, query, where } from "firebase/firestore";
-import { BarChart3, Coins, ShoppingBag, UserCircle2 } from "lucide-react";
+import { Coins, ShoppingBag, UserCircle, BarChart3 } from "lucide-react";
 
 import { db } from "@/app/lib/firebase";
 
@@ -87,16 +87,16 @@ export default function CtvPage() {
     <section className="space-y-6 lg:space-y-8">
       <header className="flex items-center justify-between gap-4 rounded-[28px] bg-white px-5 py-5 shadow-sm ring-1 ring-black/5 lg:px-8 lg:py-6">
         <div className="space-y-2">
-          <p className="text-sm font-medium uppercase tracking-[0.24em] text-[#b4534c]">Dashboard CTV</p>
+          <p className="text-sm font-medium uppercase tracking-[0.24em] text-[#b4534c]">Tổng quan CTV</p>
           <h1 className="text-2xl font-extrabold tracking-tight text-[#3f2723] lg:text-4xl">Xin chào, CTV</h1>
           <p className="max-w-xl text-sm text-[#8d6a64] lg:text-base">
-            Tổng quan realtime từ Firestore: doanh thu, số đơn thành công và hoa hồng tạm tính.
+            Tổng quan đơn hàng, doanh thu, số đơn thành công và hoa hồng tạm tính.
           </p>
         </div>
 
         <div className="flex shrink-0 items-center gap-3 rounded-full bg-[#fff7f5] px-3 py-2 shadow-inner ring-1 ring-[#f0d7d2]">
           <div className="grid h-12 w-12 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-[#dc2626] to-[#fb7185] text-white shadow-sm">
-            <UserCircle2 className="h-7 w-7" />
+            <UserCircle className="h-7 w-7" />
           </div>
           <div className="hidden sm:block">
             <div className="text-sm font-bold text-[#4b2d29]">CTV</div>
@@ -134,7 +134,7 @@ export default function CtvPage() {
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-bold text-[#3f2723]">Tình trạng đơn hàng của bạn</h2>
-            <p className="mt-1 text-sm text-[#8d6a64]">Chỉ tính các đơn do CTV này tạo ra trong Firestore.</p>
+            <p className="mt-1 text-sm text-[#8d6a64]">Chỉ tính các đơn do CTV này tạo ra.</p>
           </div>
           <div className="rounded-full bg-[#f1fbf4] px-3 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200">
             {completedOrders.length} đơn hoàn thành

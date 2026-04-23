@@ -19,8 +19,6 @@ import {
 import { auth, db } from "../lib/firebase";
 
 
-type StaffRole = "staff" | "tech_support";
-
 type NavItem = {
   label: string;
   href: string;
@@ -35,14 +33,31 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Hồ sơ", href: "/staff/profile", icon: UserRound },
 ];
 
-function isStaffRole(role: unknown): role is StaffRole {
-  return role === "staff" || role === "tech_support";
+const ROLE_LABELS: Record<string, string> = {
+  staff: "Nhân viên",
+  tech_support: "Hỗ trợ kỹ thuật",
+};
+
+function getDisplayName(user: User, userData: Record<string, unknown> | undefined) {
+  const candidates = [
+    userData?.fullName,
+    userData?.displayName,
+    userData?.name,
+    user.displayName,
+    user.email,
+  ];
+
+  const found = candidates.find((value): value is string => typeof value === "string" && value.trim().length > 0);
+  return found ?? "Tài khoản đăng nhập";
 }
+
 
 export default function StaffLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [loading, setLoading] = useState(true);
+  const [displayName, setDisplayName] = useState("Tài khoản đăng nhập");
+  const [roleLabel, setRoleLabel] = useState(ROLE_LABELS.staff);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
@@ -54,16 +69,18 @@ export default function StaffLayout({ children }: { children: ReactNode }) {
 
       try {
         const userSnap = await getDoc(doc(db, "users", user.uid));
-        const userData = userSnap.data();
+        const userData = userSnap.data() as Record<string, unknown> | undefined;
         const role = userData?.role;
 
-        if (!userSnap.exists() || !isStaffRole(role)) {
+        if (!userSnap.exists() || (role !== "staff" && role !== "tech_support")) {
           await signOut(auth);
           setLoading(false);
           router.replace("/");
           return;
         }
 
+        setDisplayName(getDisplayName(user, userData));
+        setRoleLabel(ROLE_LABELS[String(role)] ?? ROLE_LABELS.staff);
         setLoading(false);
       } catch {
         await signOut(auth);
@@ -120,9 +137,11 @@ export default function StaffLayout({ children }: { children: ReactNode }) {
             <div className="grid h-14 w-14 place-items-center rounded-full bg-[#dc2626] text-white">
               <UserRound className="h-7 w-7" />
             </div>
-            <div>
-              <div className="text-lg font-bold text-[#f0cec9]">Tên nhân viên</div>
-              <div className="text-sm text-[#9f817d]">Nhân viên</div>
+            <div className="min-w-0">
+              <div className="truncate text-lg font-bold text-[#f0cec9]" title={displayName}>
+                {displayName}
+              </div>
+              <div className="text-sm text-[#9f817d]">{roleLabel}</div>
             </div>
           </div>
           <div className="mt-4 flex gap-3">

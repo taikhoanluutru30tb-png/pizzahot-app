@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import {
   CheckCircle2,
-  Clock3,
+  Clock,
   Filter,
   MapPin,
   PackageCheck,
@@ -175,7 +175,7 @@ export default function StaffDeliveryPage() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <div className="flex items-center gap-2 text-[#c62828]">
-                <Clock3 className="h-5 w-5" />
+                <Clock className="h-5 w-5" />
                 <span className="text-sm font-bold uppercase tracking-[0.2em]">Đơn hàng chờ xếp</span>
               </div>
               <h2 className="mt-2 text-[1.15rem] font-extrabold text-[#251714] sm:text-[1.3rem]">Chọn đơn đã làm xong</h2>
@@ -216,7 +216,7 @@ export default function StaffDeliveryPage() {
                           {order.address}
                         </span>
                         <span className="inline-flex items-center gap-1.5">
-                          <Clock3 className="h-4 w-4" />
+                          <Clock className="h-4 w-4" />
                           {order.waitTime}
                         </span>
                       </div>

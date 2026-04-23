@@ -11,19 +11,18 @@ import {
   CheckCircle2,
   Home,
   LayoutDashboard,
+  LogOut,
   Menu,
   MessageSquareText,
-  Package2,
+  Package,
   UserRound,
 } from "lucide-react";
 import { auth, db } from "../lib/firebase";
 
-type ShipperRole = "shipper" | "tech_support";
-
 type NavItem = {
   label: string;
   href: string;
-  icon: typeof Package2;
+  icon: typeof Package;
 };
 
 const NAV_ITEMS: NavItem[] = [
@@ -33,14 +32,31 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Hồ sơ", href: "/shipper/profile", icon: UserRound },
 ];
 
-function isShipperRole(role: unknown): role is ShipperRole {
-  return role === "shipper" || role === "tech_support";
+const ROLE_LABELS: Record<string, string> = {
+  shipper: "Shipper",
+  tech_support: "Hỗ trợ kỹ thuật",
+};
+
+function getDisplayName(user: User, userData: Record<string, unknown> | undefined) {
+  const candidates = [
+    userData?.fullName,
+    userData?.displayName,
+    userData?.name,
+    user.displayName,
+    user.email,
+  ];
+
+  const found = candidates.find((value): value is string => typeof value === "string" && value.trim().length > 0);
+  return found ?? "Tài khoản đăng nhập";
 }
+
 
 export default function ShipperLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [loading, setLoading] = useState(true);
+  const [displayName, setDisplayName] = useState("Tài khoản đăng nhập");
+  const [roleLabel, setRoleLabel] = useState(ROLE_LABELS.shipper);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
@@ -52,16 +68,18 @@ export default function ShipperLayout({ children }: { children: ReactNode }) {
 
       try {
         const userSnap = await getDoc(doc(db, "users", user.uid));
-        const userData = userSnap.data();
+        const userData = userSnap.data() as Record<string, unknown> | undefined;
         const role = userData?.role;
 
-        if (!userSnap.exists() || !isShipperRole(role)) {
+        if (!userSnap.exists() || (role !== "shipper" && role !== "tech_support")) {
           await signOut(auth);
           setLoading(false);
           router.replace("/");
           return;
         }
 
+        setDisplayName(getDisplayName(user, userData));
+        setRoleLabel(ROLE_LABELS[String(role)] ?? ROLE_LABELS.shipper);
         setLoading(false);
       } catch {
         await signOut(auth);
@@ -122,9 +140,11 @@ export default function ShipperLayout({ children }: { children: ReactNode }) {
             <div className="grid h-14 w-14 place-items-center rounded-full bg-[#dc2626] text-white">
               <UserRound className="h-7 w-7" />
             </div>
-            <div>
-              <div className="text-lg font-bold text-[#f0cec9]">Tên nhân viên</div>
-              <div className="text-sm text-[#9f817d]">Giao hàng</div>
+            <div className="min-w-0">
+              <div className="truncate text-lg font-bold text-[#f0cec9]" title={displayName}>
+                {displayName}
+              </div>
+              <div className="text-sm text-[#9f817d]">{roleLabel}</div>
             </div>
           </div>
 
@@ -187,6 +207,19 @@ export default function ShipperLayout({ children }: { children: ReactNode }) {
               </Link>
             );
           })}
+
+          <button
+            type="button"
+            onClick={async () => {
+              await signOut(auth);
+              router.replace("/");
+            }}
+            className="flex min-w-[78px] flex-col items-center justify-center rounded-2xl px-2 py-2 text-[11px] font-medium text-[#7f625d] transition hover:bg-[#f6ebe9]"
+            aria-label="Đăng xuất"
+          >
+            <LogOut className="mb-1 h-5 w-5" />
+            <span className="truncate">Đăng xuất</span>
+          </button>
         </div>
       </nav>
     </div>

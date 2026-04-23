@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
+import { Eye, EyeOff, Lock, Shield, Truck, User, Users } from "lucide-react";
 import { auth, db } from "./lib/firebase";
 
 const IT_SUPPORT_PHONE = "0348726823";
@@ -18,47 +19,22 @@ const ROLE_CARDS: Array<{
   {
     id: "admin",
     label: "QUẢN LÝ",
-    icon: (
-      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 2 20 6v6c0 5-3.2 9.4-8 10-4.8-.6-8-5-8-10V6l8-4Z" />
-        <path d="M9.5 12a2.5 2.5 0 1 0 5 0 2.5 2.5 0 0 0-5 0Z" />
-      </svg>
-    ),
+    icon: <Shield className="h-5 w-5" />,
   },
   {
     id: "staff",
     label: "Nhân viên",
-    icon: (
-      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="m4 20 6-6" />
-        <path d="m10 20-6-6" />
-        <path d="m14 4 6 6" />
-        <path d="m20 4-6 6" />
-      </svg>
-    ),
+    icon: <Users className="h-5 w-5" />,
   },
   {
     id: "ctv",
     label: "CTV",
-    icon: (
-      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M7 13 12 8l5 5" />
-        <path d="M5 11.5 12 4l7 7.5" />
-        <path d="M6 20h12" />
-      </svg>
-    ),
+    icon: <User className="h-5 w-5" />,
   },
   {
     id: "shipper",
     label: "Giao hàng",
-    icon: (
-      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="8" cy="16" r="2" />
-        <circle cx="17" cy="16" r="2" />
-        <path d="M5 16h1.5l1.5-5h7l2 5H20" />
-        <path d="M10 11V8h3" />
-      </svg>
-    ),
+    icon: <Truck className="h-5 w-5" />,
   },
 ];
 
@@ -124,14 +100,19 @@ export default function Page() {
       const userSnap = await getDoc(userRef);
       const userData = userSnap.data();
       const roleValue = normalizeRole(userData?.role);
-      const isTechSupportAccount = roleValue === "tech_support";
-      const isSupportAccount = userData?.is_support === true || isTechSupportAccount;
+
+      if (roleValue === "tech_support") {
+        router.push("/admin");
+        return;
+      }
+
+      const isSupportAccount = userData?.is_support === true;
 
       if (!userSnap.exists() && !isSupportAccount) {
         throw new Error("Tài khoản không được cấp quyền sử dụng hệ thống.");
       }
 
-      const accountRole = roleValue ?? (isSupportAccount ? "tech_support" : null);
+      const accountRole = roleValue ?? (isSupportAccount ? "admin" : null);
 
       if (!accountRole) {
         throw new Error("Không xác định được vai trò người dùng.");
@@ -141,14 +122,12 @@ export default function Page() {
         throw new Error("Tài khoản đã bị khóa.");
       }
 
-      if (accountRole !== "tech_support") {
-        const allowedRoles = ROLE_ACCESS[accountRole] ?? [accountRole];
-        if (!allowedRoles.includes(activeRole)) {
-          throw new Error("Tài khoản này không có quyền đăng nhập với vai trò đã chọn.");
-        }
+      const allowedRoles = ROLE_ACCESS[accountRole] ?? [accountRole];
+      if (!allowedRoles.includes(activeRole)) {
+        throw new Error("Tài khoản này không có quyền đăng nhập với vai trò đã chọn.");
       }
 
-      router.replace(accountRole === "tech_support" ? "/admin" : ROLE_PATHS[activeRole]);
+      router.push(ROLE_PATHS[activeRole]);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Đăng nhập thất bại. Vui lòng kiểm tra lại email/mật khẩu.";
       setError(
@@ -199,10 +178,7 @@ export default function Page() {
               Tên đăng nhập
             </span>
             <div className="flex items-center gap-3 rounded-2xl bg-[#f5f3f2] px-4 py-4 ring-1 ring-transparent transition focus-within:ring-[#c4201d]/30">
-              <svg viewBox="0 0 24 24" className="h-5 w-5 shrink-0 text-[#9d7f79]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 21a8 8 0 1 0-16 0" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
+              <User className="h-5 w-5 shrink-0 text-[#9d7f79]" />
               <input
                 type="email"
                 autoComplete="email"
@@ -219,10 +195,7 @@ export default function Page() {
               Mật khẩu
             </span>
             <div className="flex items-center gap-3 rounded-2xl bg-[#f5f3f2] px-4 py-4 ring-1 ring-transparent transition focus-within:ring-[#c4201d]/30">
-              <svg viewBox="0 0 24 24" className="h-5 w-5 shrink-0 text-[#9d7f79]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="4" y="11" width="16" height="9" rx="2" />
-                <path d="M8 11V8a4 4 0 0 1 8 0v3" />
-              </svg>
+              <Lock className="h-5 w-5 shrink-0 text-[#9d7f79]" />
               <input
                 type={showPassword ? "text" : "password"}
                 autoComplete="current-password"
@@ -238,17 +211,9 @@ export default function Page() {
                 aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
               >
                 {showPassword ? (
-                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M3 3l18 18" />
-                    <path d="M10.6 10.6A3 3 0 0 0 13.4 13.4" />
-                    <path d="M6.2 6.2A11 11 0 0 0 2 12s3.5 8 10 8c1.8 0 3.4-.4 4.8-1.1" />
-                    <path d="M9.9 4.1A10.9 10.9 0 0 1 12 4c6.5 0 10 8 10 8a19 19 0 0 1-4.2 5.3" />
-                  </svg>
+                  <EyeOff className="h-5 w-5" />
                 ) : (
-                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M2 12s3.5-8 10-8 10 8 10 8-3.5 8-10 8-10-8-10-8Z" />
-                    <circle cx="12" cy="12" r="3" />
-                  </svg>
+                  <Eye className="h-5 w-5" />
                 )}
               </button>
             </div>
