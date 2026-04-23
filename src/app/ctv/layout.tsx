@@ -19,9 +19,7 @@ import {
 } from "lucide-react";
 import { auth, db } from "../lib/firebase";
 
-const SUPPORT_EMAIL = "quanlypizzahot@gmail.com";
-
-type CtvRole = "ctv";
+type CtvRole = "ctv" | "tech_support";
 
 type NavItem = {
   label: string;
@@ -38,11 +36,7 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 function isCtvRole(role: unknown): role is CtvRole {
-  return role === "ctv";
-}
-
-function isSupportEmail(value: unknown): value is string {
-  return typeof value === "string" && value.toLowerCase() === SUPPORT_EMAIL;
+  return role === "ctv" || role === "tech_support";
 }
 
 export default function CtvLayout({ children }: { children: ReactNode }) {
@@ -63,9 +57,8 @@ export default function CtvLayout({ children }: { children: ReactNode }) {
         const userSnap = await getDoc(doc(db, "users", user.uid));
         const userData = userSnap.data();
         const role = userData?.role;
-        const canAccessAsSupport = isSupportEmail(user.email) && userData?.blocked !== true;
 
-        if (!userSnap.exists() || (!isCtvRole(role) && !canAccessAsSupport)) {
+        if (!userSnap.exists() || !isCtvRole(role)) {
           await signOut(auth);
           setLoading(false);
           router.replace("/");

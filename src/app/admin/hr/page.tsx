@@ -108,6 +108,7 @@ export default function AdminHrPage() {
       so_dien_thoai: supportAccount.so_dien_thoai,
       role: supportAccount.role,
       mat_khau: supportAccount.mat_khau,
+      is_support: true,
     }, { merge: true });
 
     const q = query(collection(db, "users"), orderBy("ho_ten", "asc"));

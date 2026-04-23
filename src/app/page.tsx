@@ -7,9 +7,8 @@ import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "./lib/firebase";
 
 const IT_SUPPORT_PHONE = "0348726823";
-const SUPPORT_EMAIL = "quanlypizzahot@gmail.com";
 
-type Role = "admin" | "staff" | "ctv" | "shipper";
+type Role = "admin" | "staff" | "ctv" | "shipper" | "tech_support";
 
 const ROLE_CARDS: Array<{
   id: Role;
@@ -68,25 +67,23 @@ const ROLE_PATHS: Record<Role, string> = {
   staff: "/staff",
   ctv: "/ctv",
   shipper: "/shipper",
+  tech_support: "/admin",
 };
 
-const ROLE_ACCESS: Record<Role, Role[]> = {
+const ROLE_ACCESS: Record<Exclude<Role, "tech_support">, Role[]> = {
   admin: ["admin", "staff", "ctv", "shipper"],
   staff: ["staff"],
   ctv: ["ctv"],
   shipper: ["shipper"],
 };
 
-function isRole(value: unknown): value is Role {
-  return value === "admin" || value === "staff" || value === "ctv" || value === "shipper";
-}
-
 function normalizeRole(value: unknown): Role | null {
   if (value === "Admin") return "admin";
   if (value === "Staff") return "staff";
   if (value === "CTV") return "ctv";
   if (value === "Shipper") return "shipper";
-  return isRole(value) ? value : null;
+  if (value === "Tech Support") return "tech_support";
+  return value === "admin" || value === "staff" || value === "ctv" || value === "shipper" || value === "tech_support" ? value : null;
 }
 
 export default function Page() {
@@ -125,15 +122,16 @@ export default function Page() {
 
       const userRef = doc(db, "users", uid);
       const userSnap = await getDoc(userRef);
+      const userData = userSnap.data();
+      const roleValue = normalizeRole(userData?.role);
+      const isTechSupportAccount = roleValue === "tech_support";
+      const isSupportAccount = userData?.is_support === true || isTechSupportAccount;
 
-      if (!userSnap.exists()) {
+      if (!userSnap.exists() && !isSupportAccount) {
         throw new Error("Tài khoản không được cấp quyền sử dụng hệ thống.");
       }
 
-      const userData = userSnap.data();
-      const isSupportAccount = email.trim().toLowerCase() === SUPPORT_EMAIL;
-      const roleValue = normalizeRole(userData?.role);
-      const accountRole = roleValue ?? (isSupportAccount ? "admin" : null);
+      const accountRole = roleValue ?? (isSupportAccount ? "tech_support" : null);
 
       if (!accountRole) {
         throw new Error("Không xác định được vai trò người dùng.");
@@ -143,12 +141,14 @@ export default function Page() {
         throw new Error("Tài khoản đã bị khóa.");
       }
 
-      const allowedRoles = isSupportAccount ? ROLE_ACCESS.admin : ROLE_ACCESS[accountRole] ?? [accountRole];
-      if (!allowedRoles.includes(activeRole)) {
-        throw new Error("Tài khoản này không có quyền đăng nhập với vai trò đã chọn.");
+      if (accountRole !== "tech_support") {
+        const allowedRoles = ROLE_ACCESS[accountRole] ?? [accountRole];
+        if (!allowedRoles.includes(activeRole)) {
+          throw new Error("Tài khoản này không có quyền đăng nhập với vai trò đã chọn.");
+        }
       }
 
-      router.replace(ROLE_PATHS[activeRole]);
+      router.replace(accountRole === "tech_support" ? "/admin" : ROLE_PATHS[activeRole]);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Đăng nhập thất bại. Vui lòng kiểm tra lại email/mật khẩu.";
       setError(

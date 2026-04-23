@@ -22,9 +22,7 @@ import {
 } from "lucide-react";
 import { auth, db } from "../lib/firebase";
 
-const SUPPORT_EMAIL = "quanlypizzahot@gmail.com";
-
-type AdminRole = "admin";
+type AdminRole = "admin" | "tech_support";
 
 type NavItem = {
   label: string;
@@ -46,17 +44,14 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 function isAdminRole(role: unknown): role is AdminRole {
-  return role === "admin";
-}
-
-function isSupportEmail(value: unknown): value is string {
-  return typeof value === "string" && value.toLowerCase() === SUPPORT_EMAIL;
+  return role === "admin" || role === "tech_support";
 }
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [loading, setLoading] = useState(true);
+  const [isTechSupport, setIsTechSupport] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
@@ -70,15 +65,15 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         const userSnap = await getDoc(doc(db, "users", user.uid));
         const userData = userSnap.data();
         const role = userData?.role;
-        const canAccessAsSupport = isSupportEmail(user.email) && userData?.blocked !== true;
 
-        if (!userSnap.exists() || (!isAdminRole(role) && !canAccessAsSupport)) {
+        if (!userSnap.exists() || !isAdminRole(role)) {
           await signOut(auth);
           setLoading(false);
           router.replace("/");
           return;
         }
 
+        setIsTechSupport(role === "tech_support");
         setLoading(false);
       } catch {
         await signOut(auth);
@@ -172,6 +167,27 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       <main className="min-h-[calc(100vh-64px)] px-4 pb-32 pt-4 lg:px-8 lg:pb-8 lg:pt-8">
         <div className="mx-auto max-w-7xl">{children}</div>
       </main>
+
+      {isTechSupport ? (
+        <div className="fixed bottom-4 left-1/2 z-40 w-[calc(100%-1.5rem)] max-w-2xl -translate-x-1/2 rounded-2xl border border-[#f0c9c7] bg-white/95 p-3 shadow-[0_12px_35px_rgba(0,0,0,0.18)] backdrop-blur">
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {[
+              { label: "Tới Admin", href: "/admin" },
+              { label: "Tới Staff", href: "/staff" },
+              { label: "Tới CTV", href: "/ctv" },
+              { label: "Tới Shipper", href: "/shipper" },
+            ].map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="rounded-full bg-[#dc2626] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#b91c1c]"
+              >
+                {item.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <nav className="fixed bottom-0 left-0 right-0 z-30 border-t border-[#eddcda] bg-white/95 px-2 py-2 backdrop-blur lg:hidden">
         <div className="flex gap-1 overflow-x-auto pb-1">
