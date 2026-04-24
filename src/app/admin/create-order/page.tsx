@@ -8,7 +8,6 @@ import {
   ChevronDown,
   Minus,
   Plus,
-  Search,
   ShoppingBag,
   Sparkles,
   Trash,
@@ -16,28 +15,18 @@ import {
   User,
   X,
 } from "lucide-react";
-import { addDoc, collection, onSnapshot, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "@/app/lib/firebase";
-
-type MenuItem = {
-  id: string;
-  ten_mon?: string;
-  ten?: string;
-  gia_tien?: number;
-  gia?: number;
-  image?: string;
-  hinh_anh?: string;
-  danh_muc?: string;
-  mo_ta?: string;
-};
+import { MenuListSection } from "@/app/components/menu-list-section";
+import { filterAndSortMenuItems, useMenuItems, type MenuSortKey } from "@/app/lib/use-menu-items";
 
 type Product = {
   id: string;
   name: string;
   price: number;
-  image?: string;
-  category?: string;
-  description?: string;
+  imageUrl: string;
+  category: string;
+  description: string;
 };
 
 type CartItem = Product & { quantity: number };
@@ -50,7 +39,12 @@ type CustomerForm = {
 };
 
 const categories = ["Tất cả", "Pizza", "Đồ uống", "Món phụ"] as const;
-const assignTargets = ["Không gán", "Shipper #01", "Shipper #02", "Chi nhánh Quận 1", "Chi nhánh Quận 7"] as const;
+const sortOptions = [
+  { value: "recommended", label: "Gợi ý" },
+  { value: "price-asc", label: "Giá tăng dần" },
+  { value: "price-desc", label: "Giá giảm dần" },
+  { value: "name-asc", label: "Tên A-Z" },
+] as const;
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", {
   style: "currency",
@@ -62,38 +56,23 @@ function formatCurrency(value: number) {
   return currencyFormatter.format(value);
 }
 
-function normalizeMenuItem(docItem: MenuItem): Product {
-  return {
-    id: docItem.id,
-    name: docItem.ten_mon || docItem.ten || "Chưa đặt tên",
-    price: Number(docItem.gia_tien ?? docItem.gia ?? 0),
-    image: docItem.image || docItem.hinh_anh || undefined,
-    category: docItem.danh_muc || "Khác",
-    description: docItem.mo_ta || "",
-  };
-}
-
 export default function AdminCreateOrderPage() {
+  const { menuItems, categories: menuCategories, error: menuError, loading } = useMenuItems();
   const [activeCategory, setActiveCategory] = useState<(typeof categories)[number]>("Tất cả");
+  const [sort, setSort] = useState<MenuSortKey>("recommended");
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [customer, setCustomer] = useState<CustomerForm>({ name: "", phone: "", address: "", note: "" });
-  const [assignTo, setAssignTo] = useState<(typeof assignTargets)[number]>("Không gán");
-  const [menu, setMenu] = useState<Product[]>([]);
   const [loadingMenu, setLoadingMenu] = useState(true);
   const [toast, setToast] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "menu"), (snapshot) => {
-      const items = snapshot.docs.map((docItem) => normalizeMenuItem({ id: docItem.id, ...(docItem.data() as Omit<MenuItem, "id">) }));
-      setMenu(items);
+    if (menuItems.length > 0) {
       setLoadingMenu(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
+    }
+  }, [menuItems.length]);
 
   useEffect(() => {
     if (!toast) return;
@@ -102,16 +81,11 @@ export default function AdminCreateOrderPage() {
   }, [toast]);
 
   const visibleProducts = useMemo(() => {
-    const keyword = search.trim().toLowerCase();
-    return menu.filter((product) => {
-      const matchesCategory = activeCategory === "Tất cả" || product.category === activeCategory;
-      const matchesSearch =
-        keyword.length === 0 || [product.name, product.description || "", product.category || ""].some((value) => value.toLowerCase().includes(keyword));
-      return matchesCategory && matchesSearch;
-    });
-  }, [activeCategory, menu, search]);
+    return filterAndSortMenuItems(menuItems, { search, category: activeCategory, sort });
+  }, [activeCategory, menuItems, search, sort]);
 
   const subtotal = useMemo(() => cart.reduce((sum, item) => sum + item.price * item.quantity, 0), [cart]);
+  const visibleCountLabel = `${visibleProducts.length} món`;
   const total = subtotal;
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -137,7 +111,6 @@ export default function AdminCreateOrderPage() {
   const resetForm = () => {
     setCart([]);
     setCustomer({ name: "", phone: "", address: "", note: "" });
-    setAssignTo("Không gán");
   };
 
   const handleCreateOrder = async () => {
@@ -215,103 +188,24 @@ export default function AdminCreateOrderPage() {
         <div className="grid gap-6 lg:grid-cols-[1.35fr_0.9fr] lg:items-start">
           <main className="space-y-6">
             <section className="rounded-[28px] bg-white p-4 shadow-[0_10px_30px_rgba(17,24,39,0.05)] ring-1 ring-black/5 lg:p-6">
-              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h2 className="text-xl font-bold">Danh sách thực đơn</h2>
-                  <p className="mt-1 text-sm text-[#8b6d67]">Dữ liệu được lấy realtime từ collection `menu`.</p>
-                </div>
-                <div className="inline-flex items-center gap-2 rounded-full bg-[#fff7f5] px-3 py-2 text-xs font-medium text-[#8b6d67]">
-                  <ShoppingBag className="h-4 w-4 text-[#c62828]" />
-                  {visibleProducts.length} món
-                </div>
-              </div>
-
-              <div className="mb-4 grid gap-3 md:grid-cols-[1fr_auto]">
-                <label className="flex h-12 items-center gap-3 rounded-2xl border border-[#eadedb] bg-[#fffaf9] px-4 text-sm text-[#7d625d]">
-                  <Search className="h-4 w-4 text-[#c62828]" />
-                  <input
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Tìm món"
-                    className="w-full bg-transparent outline-none placeholder:text-[#b99f99]"
-                  />
-                </label>
-                <div className="inline-flex items-center justify-between rounded-2xl border border-[#eadedb] bg-[#fffaf9] px-4 py-3 text-sm text-[#7d625d] md:min-w-56">
-                  <span>{totalItems} món trong giỏ</span>
-                  <ChevronDown className="h-4 w-4" />
-                </div>
-              </div>
-
-              <div className="mb-5 flex gap-2 overflow-x-auto pb-1">
-                {categories.map((category) => {
-                  const isActive = category === activeCategory;
-                  return (
-                    <button
-                      key={category}
-                      type="button"
-                      onClick={() => setActiveCategory(category)}
-                      className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition ${
-                        isActive
-                          ? "bg-[#c62828] text-white shadow-lg shadow-[#c62828]/20"
-                          : "bg-[#fff7f6] text-[#7d625d] ring-1 ring-[#f0e3e0] hover:bg-[#fff1ef]"
-                      }`}
-                    >
-                      {category}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {loadingMenu ? (
-                <div className="rounded-3xl border border-dashed border-[#ead7d3] bg-[#fffaf9] px-4 py-10 text-center text-sm text-[#9d807a]">
-                  Đang tải thực đơn...
-                </div>
-              ) : visibleProducts.length === 0 ? (
-                <div className="rounded-3xl border border-dashed border-[#ead7d3] bg-[#fffaf9] px-4 py-10 text-center text-sm text-[#9d807a]">
-                  Chưa có món nào phù hợp.
-                </div>
-              ) : (
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
-                  {visibleProducts.map((product) => (
-                    <article
-                      key={product.id}
-                      className="group overflow-hidden rounded-[24px] bg-[#fffaf9] ring-1 ring-[#f2e7e4] transition hover:-translate-y-0.5 hover:shadow-[0_16px_36px_rgba(17,24,39,0.08)]"
-                    >
-                      <div className="relative h-44 overflow-hidden">
-                        {product.image ? (
-                          <Image src={product.image} alt={product.name} fill className="object-cover transition duration-500 group-hover:scale-105" />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#fff1f0] to-[#ffe9e5] text-4xl font-black text-[#c62828]">
-                            {product.name.slice(0, 1).toUpperCase()}
-                          </div>
-                        )}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
-                        <span className="absolute left-4 top-4 rounded-full bg-black/65 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
-                          {product.category || "Khác"}
-                        </span>
-                      </div>
-
-                      <div className="space-y-3 p-4">
-                        <div>
-                          <h3 className="text-lg font-bold">{product.name}</h3>
-                        </div>
-
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="text-lg font-black text-[#c62828]">{formatCurrency(product.price)}</div>
-                          <button
-                            type="button"
-                            onClick={() => addToCart(product)}
-                            className="inline-flex items-center gap-2 rounded-2xl bg-[#c62828] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#c62828]/20 transition hover:bg-[#a61f1f]"
-                          >
-                            <Plus className="h-4 w-4" />
-                            Thêm vào giỏ
-                          </button>
-                        </div>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              )}
+              <MenuListSection
+                title="Danh sách thực đơn"
+                subtitle="Dữ liệu được lấy realtime từ collection `menu`."
+                items={visibleProducts}
+                categories={menuCategories}
+                activeCategory={activeCategory}
+                onCategoryChange={(category) => setActiveCategory(category as (typeof categories)[number])}
+                search={search}
+                onSearchChange={setSearch}
+                sort={sort}
+                onSortChange={setSort}
+                countLabel={visibleCountLabel}
+                loading={loading}
+                error={menuError}
+                emptyDescription="Chưa có món nào phù hợp."
+                actionLabel="Thêm vào giỏ"
+                onAction={addToCart}
+              />
             </section>
           </main>
 
@@ -361,7 +255,7 @@ export default function AdminCreateOrderPage() {
                     <div key={item.id} className="rounded-2xl bg-[#fffaf9] p-3 ring-1 ring-[#f1e4e1]">
                       <div className="flex items-start gap-3">
                         <div className="relative h-16 w-16 overflow-hidden rounded-2xl">
-                          {item.image ? <Image src={item.image} alt={item.name} fill className="object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-[#ffe9e5] font-bold text-[#c62828]">{item.name.slice(0, 1)}</div>}
+                          {item.imageUrl ? <Image src={item.imageUrl} alt={item.name} fill className="object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-[#ffe9e5] font-bold text-[#c62828]">{item.name.slice(0, 1)}</div>}
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-2">
@@ -400,29 +294,6 @@ export default function AdminCreateOrderPage() {
                 </div>
               </div>
 
-              <div className="mt-5 space-y-3 rounded-[24px] bg-[#fffaf9] p-4 ring-1 ring-[#f4e9e7]">
-                <div className="flex items-center gap-2 text-sm font-semibold text-[#2b1715]">
-                  <Truck className="h-4 w-4 text-[#c62828]" />
-                  Gán đơn cho Admin
-                </div>
-                <label className="grid gap-2 text-sm font-medium text-[#694f49]">
-                  <span className="sr-only">Gán đơn cho shipper hoặc chi nhánh</span>
-                  <div className="relative">
-                    <select value={assignTo} onChange={(event) => setAssignTo(event.target.value as (typeof assignTargets)[number])} className="h-12 w-full appearance-none rounded-2xl border border-[#eadedb] bg-white px-4 pr-11 text-sm outline-none transition focus:border-[#c62828]">
-                      {assignTargets.map((target) => (
-                        <option key={target} value={target}>
-                          {target}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8b6d67]" />
-                  </div>
-                </label>
-                <div className="flex items-start gap-2 rounded-2xl bg-white px-3 py-3 text-xs text-[#8b6d67] ring-1 ring-[#f2e5e2]">
-                  <Building className="mt-0.5 h-4 w-4 shrink-0 text-[#c62828]" />
-                  <p>Admin có thể gán đơn trực tiếp cho shipper hoặc chi nhánh để điều phối xử lý nhanh hơn.</p>
-                </div>
-              </div>
 
               <button
                 type="button"
@@ -483,23 +354,6 @@ export default function AdminCreateOrderPage() {
               <textarea value={customer.note} onChange={(event) => updateCustomer("note", event.target.value)} placeholder="Ghi chú" rows={3} className="rounded-2xl border border-[#eadedb] bg-[#fffaf9] px-4 py-3 text-sm outline-none transition placeholder:text-[#b99f99] focus:border-[#c62828]" />
             </section>
 
-            <section className="mt-4 space-y-3 rounded-[24px] bg-white p-4 ring-1 ring-[#f4e9e7]">
-              <div className="flex items-center gap-2 text-sm font-semibold text-[#2b1715]">
-                <Truck className="h-4 w-4 text-[#c62828]" />
-                Gán đơn cho Admin
-              </div>
-              <div className="relative">
-                <select value={assignTo} onChange={(event) => setAssignTo(event.target.value as (typeof assignTargets)[number])} className="h-12 w-full appearance-none rounded-2xl border border-[#eadedb] bg-[#fffaf9] px-4 pr-11 text-sm outline-none transition focus:border-[#c62828]">
-                  {assignTargets.map((target) => (
-                    <option key={target} value={target}>
-                      {target}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8b6d67]" />
-              </div>
-            </section>
-
             <div className="mt-4 space-y-3">
               {cart.length === 0 ? (
                 <div className="rounded-3xl border border-dashed border-[#ead7d3] bg-[#fffaf9] px-4 py-10 text-center text-sm text-[#9d807a]">Chưa có món nào được chọn.</div>
@@ -508,7 +362,7 @@ export default function AdminCreateOrderPage() {
                   <div key={item.id} className="rounded-2xl bg-[#fffaf9] p-3 ring-1 ring-[#f1e4e1]">
                     <div className="flex items-start gap-3">
                       <div className="relative h-16 w-16 overflow-hidden rounded-2xl">
-                        {item.image ? <Image src={item.image} alt={item.name} fill className="object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-[#ffe9e5] font-bold text-[#c62828]">{item.name.slice(0, 1)}</div>}
+                        {item.imageUrl ? <Image src={item.imageUrl} alt={item.name} fill className="object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-[#ffe9e5] font-bold text-[#c62828]">{item.name.slice(0, 1)}</div>}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-2">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import type { FormEvent } from "react";
 import {
   addDoc,
@@ -10,33 +10,26 @@ import {
   serverTimestamp,
   updateDoc,
 } from "firebase/firestore";
-import {
-  ArrowDownWideNarrow,
-  ChefHat,
-  Edit3,
-  Filter,
-  Plus,
-  Search,
-  Trash2,
-  UtensilsCrossed,
-  X,
-} from "lucide-react";
+import { Edit3, Plus, Trash2, UtensilsCrossed, X } from "lucide-react";
 
 import { db } from "@/app/lib/firebase";
+import { MenuListSection } from "@/app/components/menu-list-section";
 import { useMenuItems, type MenuItem } from "@/app/lib/use-menu-items";
 
 type MenuFormState = {
   name: string;
   price: string;
-  category: string;
+  phan_loai: string;
   description: string;
   imageUrl: string;
 };
 
+const categoryOptions = ["Pizza", "Đồ uống", "Khai vị", "Món chính"] as const;
+
 const emptyForm: MenuFormState = {
   name: "",
   price: "",
-  category: "Pizza",
+  phan_loai: "Pizza",
   description: "",
   imageUrl: "",
 };
@@ -67,9 +60,10 @@ function ActionButton({ icon: Icon, label, tone = "neutral", onClick }: { icon: 
 }
 
 export default function AdminMenuPage() {
-  const { menuItems: items, error: menuError } = useMenuItems();
+  const { menuItems: items, categories, loading, error: menuError } = useMenuItems();
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("Tất cả");
+  const [sort, setSort] = useState("recommended");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [form, setForm] = useState<MenuFormState>(emptyForm);
@@ -77,36 +71,12 @@ export default function AdminMenuPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const categories = useMemo(() => {
-    const unique = Array.from(new Set(items.map((item) => item.category).filter(Boolean)));
-    return ["Tất cả", ...unique];
-  }, [items]);
-
-  useEffect(() => {
-    if (categories.length > 0 && !categories.includes(activeCategory)) {
-      setActiveCategory("Tất cả");
-    }
-  }, [categories]);
-
-  const filteredItems = useMemo(() => {
-    const queryText = search.trim().toLowerCase();
-    return items.filter((item) => {
-      const matchesCategory = activeCategory === "Tất cả" || item.category === activeCategory;
-      const matchesSearch =
-        !queryText ||
-        item.name.toLowerCase().includes(queryText) ||
-        item.category.toLowerCase().includes(queryText) ||
-        item.description.toLowerCase().includes(queryText);
-      return matchesCategory && matchesSearch;
-    });
-  }, [activeCategory, items, search]);
-
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
     setSuccess(null);
 
-    if (!form.name.trim() || !form.category.trim() || !form.imageUrl.trim()) {
+    if (!form.name.trim() || !form.phan_loai.trim() || !form.imageUrl.trim()) {
       setError("Vui lòng nhập Tên món, Phân loại và Link ảnh.");
       return;
     }
@@ -122,7 +92,7 @@ export default function AdminMenuPage() {
       const payload = {
         name: form.name.trim(),
         price: priceNumber,
-        category: form.category.trim(),
+        phan_loai: form.phan_loai.trim(),
         description: form.description.trim(),
         imageUrl: form.imageUrl.trim(),
       };
@@ -162,7 +132,7 @@ export default function AdminMenuPage() {
     setForm({
       name: item.name,
       price: String(item.price),
-      category: item.category,
+      phan_loai: item.category,
       description: item.description,
       imageUrl: item.imageUrl,
     });
@@ -223,110 +193,38 @@ export default function AdminMenuPage() {
       ) : null}
 
       <section className="rounded-[28px] border border-[#efdfdc] bg-white p-4 shadow-[0_12px_40px_rgba(97,39,25,0.06)] sm:p-5 lg:p-6">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#fff0ef] text-[#c62828]">
-              <UtensilsCrossed className="h-5 w-5" />
-            </div>
-            <div>
-              <h2 className="text-lg font-extrabold text-[#251714]">Danh sách thực đơn</h2>
-              <p className="text-sm text-[#9d7f79]">{filteredItems.length} món được hiển thị</p>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <label className="relative block min-w-0 sm:min-w-[280px]">
-              <span className="sr-only">Tìm kiếm món ăn</span>
-              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#aa8c85]" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Tìm tên, loại, mô tả..."
-                className="w-full rounded-2xl border border-[#e7dbd8] bg-[#fcfaf9] py-3 pl-11 pr-4 text-sm font-medium text-[#4d3b37] outline-none transition placeholder:text-[#b99c95] focus:border-[#c62828] focus:bg-white"
-              />
-            </label>
-
-            <button
-              type="button"
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#e7dbd8] bg-[#fcfaf9] px-4 py-3 font-semibold text-[#6f5752] transition hover:bg-white"
-            >
-              <Filter className="h-4 w-4" />
-              Bộ lọc
-            </button>
-
-            <button
-              type="button"
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#e7dbd8] bg-[#fcfaf9] px-4 py-3 font-semibold text-[#6f5752] transition hover:bg-white"
-            >
-              <ArrowDownWideNarrow className="h-4 w-4" />
-              Sắp xếp
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-5 flex flex-wrap gap-2">
-          {categories.map((category) => {
-            const active = activeCategory === category;
-            return (
-              <button
-                key={category}
-                type="button"
-                onClick={() => setActiveCategory(category)}
-                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-                  active
-                    ? "bg-[#c62828] text-white shadow-[0_10px_20px_rgba(198,40,40,0.18)]"
-                    : "bg-[#fff7f6] text-[#6f5752] hover:bg-[#f6ecea]"
-                }`}
-              >
-                {category}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="mt-6 hidden overflow-hidden rounded-[24px] border border-[#f0e3df] md:block">
-          <table className="min-w-full divide-y divide-[#f1e4e0]">
-            <thead className="bg-[#fcf8f7]">
-              <tr className="text-left text-[11px] font-extrabold uppercase tracking-[0.18em] text-[#a78b85]">
+        <div className="overflow-hidden rounded-[24px] border border-[#f1e5e1] bg-white shadow-[0_10px_24px_rgba(97,39,25,0.04)]">
+          <table className="min-w-full divide-y divide-[#f3e8e5]">
+            <thead className="bg-[#fcf8f7] text-left text-[11px] font-extrabold uppercase tracking-[0.18em] text-[#a78b85]">
+              <tr>
                 <th className="px-4 py-4">Món ăn</th>
                 <th className="px-4 py-4">Phân loại</th>
                 <th className="px-4 py-4">Giá</th>
-                <th className="px-4 py-4 text-right">Hành động</th>
+                <th className="px-4 py-4">Mô tả</th>
+                <th className="px-4 py-4 text-right">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#f6eeeb] bg-white">
-              {filteredItems.map((item) => (
-                <tr key={item.id} className="align-middle transition hover:bg-[#fffdfc]">
+              {items.map((item) => (
+                <tr key={item.id} className="align-top transition hover:bg-[#fffdfc]">
                   <td className="px-4 py-4">
-                    <div className="flex items-center gap-4">
-                      <img src={item.imageUrl} alt={item.name} className="h-14 w-14 rounded-2xl object-cover ring-1 ring-[#edded9]" />
-                      <div>
-                        <p className="font-extrabold text-[#261815]">{item.name}</p>
-                        <p className="mt-1 line-clamp-2 text-sm text-[#9d7f79]">{item.description || "Không có mô tả"}</p>
-                      </div>
-                    </div>
+                    <div className="font-semibold text-[#2a1d1a]">{item.name}</div>
+                    <div className="mt-1 text-xs text-[#9a7d77]">ID: {item.id}</div>
                   </td>
                   <td className="px-4 py-4">
-                    <span className="inline-flex rounded-full bg-[#f8f2f1] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-[#8a6f69]">
+                    <span className="inline-flex rounded-full bg-[#fff7f5] px-3 py-1.5 text-xs font-bold text-[#c62828] ring-1 ring-[#f4c8c4]">
                       {item.category}
                     </span>
                   </td>
-                  <td className="px-4 py-4 text-[1.05rem] font-black text-[#c62828]">{formatCurrency(item.price)}</td>
-                  <td className="px-4 py-4">
-                    <div className="flex justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={() => openEditForm(item)}
-                        className="inline-flex items-center gap-2 rounded-xl border border-[#eadad5] bg-white px-3 py-2 text-sm font-semibold text-[#6f5752] transition hover:bg-[#faf6f5]"
-                      >
+                  <td className="px-4 py-4 font-black text-[#2a1d1a]">{formatCurrency(item.price)}</td>
+                  <td className="px-4 py-4 text-sm text-[#6f5a55]">{item.description || "Không có mô tả"}</td>
+                  <td className="px-4 py-4 text-right">
+                    <div className="inline-flex items-center gap-2">
+                      <button type="button" onClick={() => openEditForm(item)} className="inline-flex items-center gap-2 rounded-2xl border border-[#eadad5] bg-white px-3 py-2 text-sm font-semibold text-[#6f5752] transition hover:bg-[#faf6f5]">
                         <Edit3 className="h-4 w-4" />
                         Sửa
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(item.id)}
-                        className="inline-flex items-center gap-2 rounded-xl border border-[#f2d1d1] bg-[#fff7f7] px-3 py-2 text-sm font-semibold text-[#c62828] transition hover:bg-[#ffecec]"
-                      >
+                      <button type="button" onClick={() => handleDelete(item.id)} className="inline-flex items-center gap-2 rounded-2xl border border-[#f2d1d1] bg-[#fff7f7] px-3 py-2 text-sm font-semibold text-[#c62828] transition hover:bg-[#ffecec]">
                         <Trash2 className="h-4 w-4" />
                         Xóa
                       </button>
@@ -337,46 +235,6 @@ export default function AdminMenuPage() {
             </tbody>
           </table>
         </div>
-
-        <div className="mt-6 grid grid-cols-1 gap-3 md:hidden">
-          {filteredItems.map((item) => (
-            <article key={item.id} className="rounded-[24px] border border-[#f0e3df] bg-[#fffdfc] p-4 shadow-[0_8px_24px_rgba(97,39,25,0.04)]">
-              <div className="flex gap-4">
-                <img src={item.imageUrl} alt={item.name} className="h-20 w-20 rounded-2xl object-cover ring-1 ring-[#edded9]" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <h3 className="truncate text-base font-extrabold text-[#261815]">{item.name}</h3>
-                      <p className="mt-1 text-sm text-[#9d7f79]">{item.description || "Không có mô tả"}</p>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-[#f8f2f1] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-[#8a6f69]">
-                      {item.category}
-                    </span>
-                    <span className="text-lg font-black text-[#c62828]">{formatCurrency(item.price)}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-4 flex items-center justify-end gap-2 border-t border-[#f3e8e5] pt-4">
-                <ActionButton icon={Edit3} label={`Sửa ${item.name}`} onClick={() => openEditForm(item)} />
-                <ActionButton icon={Trash2} label={`Xóa ${item.name}`} tone="danger" onClick={() => handleDelete(item.id)} />
-              </div>
-            </article>
-          ))}
-        </div>
-
-        {filteredItems.length === 0 ? (
-          <div className="mt-6 rounded-[24px] border border-dashed border-[#e8d8d3] bg-[#fcfaf9] p-8 text-center">
-            <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-[#fff0ef] text-[#c62828]">
-              <ChefHat className="h-6 w-6" />
-            </div>
-            <h3 className="mt-4 text-lg font-extrabold text-[#251714]">Không tìm thấy món ăn phù hợp</h3>
-            <p className="mt-2 text-sm text-[#9d7f79]">Thử thay đổi từ khóa tìm kiếm hoặc thêm món mới.</p>
-          </div>
-        ) : null}
       </section>
 
       {isFormOpen ? (
@@ -424,12 +282,17 @@ export default function AdminMenuPage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="grid gap-2">
                   <span className="text-sm font-semibold text-[#5b4742]">Phân loại</span>
-                  <input
-                    value={form.category}
-                    onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))}
+                  <select
+                    value={form.phan_loai}
+                    onChange={(e) => setForm((prev) => ({ ...prev, phan_loai: e.target.value }))}
                     className="rounded-2xl border border-[#e7dbd8] bg-[#fcfaf9] px-4 py-3 outline-none transition focus:border-[#c62828]"
-                    placeholder="Pizza / Burger / Drinks..."
-                  />
+                  >
+                    {categoryOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
                 </label>
 
                 <label className="grid gap-2">

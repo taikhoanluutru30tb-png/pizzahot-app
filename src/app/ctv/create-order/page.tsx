@@ -1,25 +1,29 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   CheckCircle2,
   Minus,
   Plus,
-  Search,
   ShoppingCart,
   Sparkles,
   Trash2,
   User2,
 } from "lucide-react";
+import { doc, getDoc, collection, onSnapshot, query, where, type DocumentData, type QueryDocumentSnapshot } from "firebase/firestore";
+
+import { auth, db } from "@/app/lib/firebase";
+import { MenuListSection } from "@/app/components/menu-list-section";
+import { filterAndSortMenuItems, useMenuItems, type MenuItem, type MenuSortKey } from "@/app/lib/use-menu-items";
 
 type Product = {
   id: string;
   name: string;
   description: string;
   price: number;
-  image: string;
+  imageUrl: string;
   category: string;
 };
 
@@ -32,58 +36,25 @@ type CustomerForm = {
   note: string;
 };
 
-const categories = ["Tất cả", "Pizza", "Đồ uống", "Món phụ"] as const;
+type OrderItem = {
+  danh_sach_mon?: unknown;
+  tong_tien?: unknown;
+  phan_loai?: unknown;
+  category?: unknown;
+  ten_mon?: unknown;
+  name?: unknown;
+  gia_tien?: unknown;
+  price?: unknown;
+  thanh_tien?: unknown;
+  so_luong?: unknown;
+  quantity?: unknown;
+};
 
-const products: Product[] = [
-  {
-    id: "pizza-hai-san",
-    name: "Pizza Hải Sản",
-    description: "Tôm, mực, thanh cua và sốt phô mai béo ngậy.",
-    price: 189000,
-    image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=900&q=80",
-    category: "Pizza",
-  },
-  {
-    id: "pizza-bo-nuong",
-    name: "Pizza Bò Nướng BBQ",
-    description: "Bò nướng mềm, sốt BBQ đậm vị, viền bánh giòn rụm.",
-    price: 179000,
-    image: "https://images.unsplash.com/photo-1593560708920-61dd98c46a4e?auto=format&fit=crop&w=900&q=80",
-    category: "Pizza",
-  },
-  {
-    id: "pizza-pho-mai",
-    name: "Pizza 5 Loại Phô Mai",
-    description: "Mozzarella, cheddar, parmesan và phô mai xanh.",
-    price: 155000,
-    image: "https://images.unsplash.com/photo-1548365328-9f547fb09533?auto=format&fit=crop&w=900&q=80",
-    category: "Pizza",
-  },
-  {
-    id: "coca-cola",
-    name: "Coca Cola 1.5L",
-    description: "Thức uống mát lạnh, phù hợp cho bữa ăn gia đình.",
-    price: 25000,
-    image: "https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&w=900&q=80",
-    category: "Đồ uống",
-  },
-  {
-    id: "khoai-tay",
-    name: "Khoai Tây Chiên",
-    description: "Khoai giòn vàng, ăn kèm tương cà hoặc sốt phô mai.",
-    price: 39000,
-    image: "https://images.unsplash.com/photo-1630383249896-424e482df921?auto=format&fit=crop&w=900&q=80",
-    category: "Món phụ",
-  },
-  {
-    id: "tra-chanh",
-    name: "Trà Chanh",
-    description: "Chua ngọt mát lạnh, rất hợp với pizza nóng hổi.",
-    price: 29000,
-    image: "https://images.unsplash.com/photo-1556679343-c7306c1976bc?auto=format&fit=crop&w=900&q=80",
-    category: "Đồ uống",
-  },
-];
+type UserProfile = {
+  nhom_ctv?: unknown;
+};
+
+const categories = ["Tất cả", "Pizza", "Đồ uống", "Món phụ"] as const;
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", {
   style: "currency",
@@ -95,9 +66,25 @@ function formatCurrency(value: number) {
   return currencyFormatter.format(value);
 }
 
+function toText(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function toNumber(value: unknown) {
+  return typeof value === "number" ? value : Number(value) || 0;
+}
+
+function isPizzaItem(item: OrderItem) {
+  const category = toText(item.phan_loai || item.category).toLowerCase();
+  const name = toText(item.ten_mon || item.name).toLowerCase();
+  return category === "pizza" || name.includes("pizza");
+}
+
 export default function CtvCreateOrderPage() {
+  const { menuItems, categories: menuCategories, loading, error: menuError } = useMenuItems();
   const [activeCategory, setActiveCategory] = useState<(typeof categories)[number]>("Tất cả");
   const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<MenuSortKey>("recommended");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customer, setCustomer] = useState<CustomerForm>({
     name: "",
@@ -105,26 +92,91 @@ export default function CtvCreateOrderPage() {
     address: "",
     note: "",
   });
+  const [completedOrders, setCompletedOrders] = useState<OrderItem[]>([]);
+  const [currentUserGroup, setCurrentUserGroup] = useState<string>("");
+  const [commissionLoading, setCommissionLoading] = useState(true);
+
+  useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) {
+      setCurrentUserGroup("");
+      setCommissionLoading(false);
+      return;
+    }
+
+    let isActive = true;
+    setCommissionLoading(true);
+
+    getDoc(doc(db, "users", uid))
+      .then((snapshot) => {
+        if (!isActive) return;
+        const data = (snapshot.data() || {}) as UserProfile;
+        setCurrentUserGroup(toText(data.nhom_ctv).toLowerCase());
+      })
+      .catch((error) => {
+        console.error("Failed to load CTV profile:", error);
+        if (isActive) setCurrentUserGroup("");
+      })
+      .finally(() => {
+        if (isActive) setCommissionLoading(false);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) {
+      setCompletedOrders([]);
+      return;
+    }
+
+    const ordersQuery = query(
+      collection(db, "orders"),
+      where("nguoi_tao", "==", uid),
+      where("trang_thai", "==", "Hoàn thành"),
+    );
+
+    const unsubscribe = onSnapshot(
+      ordersQuery,
+      (snapshot) => {
+        setCompletedOrders(snapshot.docs.map((docSnapshot: QueryDocumentSnapshot<DocumentData>) => ({ id: docSnapshot.id, ...(docSnapshot.data() as OrderItem) })));
+      },
+      (snapshotError) => {
+        console.error("Failed to subscribe to completed orders:", snapshotError);
+        setCompletedOrders([]);
+      },
+    );
+
+    return unsubscribe;
+  }, []);
 
   const visibleProducts = useMemo(() => {
-    const keyword = search.trim().toLowerCase();
-    return products.filter((product) => {
-      const matchesCategory = activeCategory === "Tất cả" || product.category === activeCategory;
-      const matchesSearch =
-        keyword.length === 0 ||
-        [product.name, product.description, product.category].some((value) =>
-          value.toLowerCase().includes(keyword),
-        );
-      return matchesCategory && matchesSearch;
-    });
-  }, [activeCategory, search]);
+    return filterAndSortMenuItems(menuItems, { search, category: activeCategory, sort });
+  }, [activeCategory, menuItems, search, sort]);
 
   const subtotal = useMemo(() => cart.reduce((sum, item) => sum + item.price * item.quantity, 0), [cart]);
   const shipping = subtotal === 0 || subtotal >= 300000 ? 0 : 20000;
   const total = subtotal + shipping;
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
-  const addToCart = (product: Product) => {
+  const commissionTotal = useMemo(() => {
+    return completedOrders.reduce((sum, order) => {
+      const orderBase = toNumber(order.tong_tien) * 0.1;
+      const items = Array.isArray(order.danh_sach_mon) ? order.danh_sach_mon : [];
+      const pizzaTotal = items.reduce((pizzaSum, item) => {
+        if (!isPizzaItem(item)) return pizzaSum;
+        const lineTotal = toNumber(item.thanh_tien) || toNumber(item.gia_tien) * toNumber(item.so_luong || item.quantity || 1);
+        return pizzaSum + lineTotal;
+      }, 0);
+      const bonusRate = currentUserGroup === "vip" ? 0.08 : 0.05;
+      return sum + orderBase + pizzaTotal * bonusRate;
+    }, 0);
+  }, [completedOrders, currentUserGroup]);
+
+  const addToCart = (product: MenuItem) => {
     setCart((current) => {
       const existing = current.find((item) => item.id === product.id);
       if (!existing) return [...current, { ...product, quantity: 1 }];
@@ -175,95 +227,24 @@ export default function CtvCreateOrderPage() {
 
         <div className="grid gap-6 lg:grid-cols-[1.35fr_0.9fr] lg:items-start">
           <main className="space-y-6">
-            <section className="rounded-[28px] bg-white p-4 shadow-[0_10px_30px_rgba(17,24,39,0.05)] ring-1 ring-black/5 lg:p-6">
-              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h2 className="text-xl font-bold">Chọn món</h2>
-                  <p className="mt-1 text-sm text-[#8b6d67]">Tìm món nhanh và thêm vào giỏ bằng nút +.</p>
-                </div>
-                <div className="inline-flex items-center gap-2 rounded-full bg-[#fff7f5] px-3 py-2 text-xs font-medium text-[#8b6d67]">
-                  <ShoppingCart className="h-4 w-4 text-[#c62828]" />
-                  {totalItems} món trong giỏ
-                </div>
-              </div>
-
-              <div className="mb-4 grid gap-3 md:grid-cols-[1fr_auto]">
-                <label className="flex h-12 items-center gap-3 rounded-2xl border border-[#eadedb] bg-[#fffaf9] px-4 text-sm text-[#7d625d]">
-                  <Search className="h-4 w-4 text-[#c62828]" />
-                  <input
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Tìm món, ví dụ: Pizza Hải Sản"
-                    className="w-full bg-transparent outline-none placeholder:text-[#b99f99]"
-                  />
-                </label>
-                <div className="inline-flex items-center justify-between rounded-2xl border border-[#eadedb] bg-[#fffaf9] px-4 py-3 text-sm text-[#7d625d] md:min-w-56">
-                  <span>{visibleProducts.length} món</span>
-                  <CheckCircle2 className="h-4 w-4 text-[#c62828]" />
-                </div>
-              </div>
-
-              <div className="mb-5 flex gap-2 overflow-x-auto pb-1">
-                {categories.map((category) => {
-                  const isActive = category === activeCategory;
-                  return (
-                    <button
-                      key={category}
-                      type="button"
-                      onClick={() => setActiveCategory(category)}
-                      className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition ${
-                        isActive
-                          ? "bg-[#c62828] text-white shadow-lg shadow-[#c62828]/20"
-                          : "bg-[#fff7f6] text-[#7d625d] ring-1 ring-[#f0e3e0] hover:bg-[#fff1ef]"
-                      }`}
-                    >
-                      {category}
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                {visibleProducts.map((product) => (
-                  <article
-                    key={product.id}
-                    className="group overflow-hidden rounded-[24px] bg-[#fffaf9] ring-1 ring-[#f2e7e4] transition hover:-translate-y-0.5 hover:shadow-[0_16px_36px_rgba(17,24,39,0.08)]"
-                  >
-                    <div className="relative h-44 overflow-hidden">
-                      <Image
-                        src={product.image}
-                        alt={product.name}
-                        fill
-                        className="object-cover transition duration-500 group-hover:scale-105"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
-                      <span className="absolute left-4 top-4 rounded-full bg-black/65 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
-                        {product.category}
-                      </span>
-                    </div>
-
-                    <div className="space-y-3 p-4">
-                      <div>
-                        <h3 className="text-lg font-bold">{product.name}</h3>
-                        <p className="mt-1 text-sm leading-6 text-[#8b6d67]">{product.description}</p>
-                      </div>
-
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="text-lg font-black text-[#c62828]">{formatCurrency(product.price)}</div>
-                        <button
-                          type="button"
-                          onClick={() => addToCart(product)}
-                          className="inline-flex items-center gap-2 rounded-2xl bg-[#c62828] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#c62828]/20 transition hover:bg-[#a61f1f]"
-                        >
-                          <Plus className="h-4 w-4" />
-                          Thêm món
-                        </button>
-                      </div>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </section>
+            <MenuListSection
+              title="Chọn món"
+              subtitle="Tìm món nhanh và thêm vào giỏ bằng nút +."
+              items={visibleProducts}
+              categories={menuCategories}
+              activeCategory={activeCategory}
+              onCategoryChange={(category) => setActiveCategory(category as (typeof categories)[number])}
+              search={search}
+              onSearchChange={setSearch}
+              sort={sort}
+              onSortChange={setSort}
+              countLabel={`${visibleProducts.length} món`}
+              loading={loading}
+              error={menuError}
+              emptyDescription="Chưa có món nào phù hợp."
+              actionLabel="Thêm món"
+              onAction={addToCart}
+            />
 
             <section className="rounded-[28px] bg-white p-5 shadow-[0_10px_30px_rgba(17,24,39,0.05)] ring-1 ring-black/5 lg:p-6">
               <div className="mb-4 flex items-center gap-2">
@@ -331,7 +312,7 @@ export default function CtvCreateOrderPage() {
                     <div key={item.id} className="rounded-2xl bg-[#fffaf9] p-3 ring-1 ring-[#f1e4e1]">
                       <div className="flex items-start gap-3">
                         <div className="relative h-16 w-16 overflow-hidden rounded-2xl">
-                          <Image src={item.image} alt={item.name} fill className="object-cover" />
+                          <Image src={item.imageUrl} alt={item.name} fill className="object-cover" />
                         </div>
 
                         <div className="min-w-0 flex-1">
@@ -340,39 +321,22 @@ export default function CtvCreateOrderPage() {
                               <h3 className="truncate font-semibold text-[#2b1715]">{item.name}</h3>
                               <p className="text-sm text-[#8b6d67]">{formatCurrency(item.price)}</p>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => removeItem(item.id)}
-                              className="rounded-full p-1.5 text-[#9d807a] transition hover:bg-[#fff1f0] hover:text-[#c62828]"
-                              aria-label={`Xóa ${item.name}`}
-                            >
+                            <button type="button" onClick={() => removeItem(item.id)} className="rounded-full p-1.5 text-[#9d807a] transition hover:bg-[#fff1f0] hover:text-[#c62828]" aria-label={`Xóa ${item.name}`}>
                               <Trash2 className="h-4 w-4" />
                             </button>
                           </div>
 
                           <div className="mt-3 flex items-center justify-between gap-3">
                             <div className="inline-flex items-center rounded-full bg-white p-1 ring-1 ring-[#eadedb]">
-                              <button
-                                type="button"
-                                onClick={() => updateQuantity(item.id, -1)}
-                                className="grid h-8 w-8 place-items-center rounded-full text-[#7d625d] transition hover:bg-[#fff1f0]"
-                              >
+                              <button type="button" onClick={() => updateQuantity(item.id, -1)} className="grid h-8 w-8 place-items-center rounded-full text-[#7d625d] transition hover:bg-[#fff1f0]">
                                 <Minus className="h-4 w-4" />
                               </button>
-                              <span className="min-w-9 px-2 text-center text-sm font-bold text-[#2b1715]">
-                                {item.quantity}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => updateQuantity(item.id, 1)}
-                                className="grid h-8 w-8 place-items-center rounded-full text-[#7d625d] transition hover:bg-[#fff1f0]"
-                              >
+                              <span className="min-w-9 px-2 text-center text-sm font-bold text-[#2b1715]">{item.quantity}</span>
+                              <button type="button" onClick={() => updateQuantity(item.id, 1)} className="grid h-8 w-8 place-items-center rounded-full text-[#7d625d] transition hover:bg-[#fff1f0]">
                                 <Plus className="h-4 w-4" />
                               </button>
                             </div>
-                            <div className="text-sm font-bold text-[#2b1715]">
-                              {formatCurrency(item.price * item.quantity)}
-                            </div>
+                            <div className="text-sm font-bold text-[#2b1715]">{formatCurrency(item.price * item.quantity)}</div>
                           </div>
                         </div>
                       </div>
@@ -388,9 +352,7 @@ export default function CtvCreateOrderPage() {
                 </div>
                 <div className="flex items-center justify-between text-[#7d625d]">
                   <span>Phí giao hàng</span>
-                  <span className="font-semibold text-[#2b1715]">
-                    {shipping === 0 ? "Miễn phí" : formatCurrency(shipping)}
-                  </span>
+                  <span className="font-semibold text-[#2b1715]">{shipping === 0 ? "Miễn phí" : formatCurrency(shipping)}</span>
                 </div>
                 <div className="flex items-center justify-between border-t border-dashed border-[#eadedb] pt-3">
                   <span className="text-base font-bold text-[#2b1715]">Tổng tiền</span>
@@ -398,12 +360,25 @@ export default function CtvCreateOrderPage() {
                 </div>
               </div>
 
-              <button
-                type="button"
-                className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#c62828] px-4 py-4 text-sm font-bold text-white shadow-lg shadow-[#c62828]/20 transition hover:bg-[#a61f1f]"
-              >
+              <button type="button" className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#c62828] px-4 py-4 text-sm font-bold text-white shadow-lg shadow-[#c62828]/20 transition hover:bg-[#a61f1f]">
                 Lưu đơn hàng
               </button>
+            </section>
+
+            <section className="rounded-[28px] bg-[#1f2937] p-5 text-white shadow-[0_10px_30px_rgba(17,24,39,0.12)] ring-1 ring-black/5">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-white/70">Hoa hồng tạm tính</p>
+                  <h3 className="text-2xl font-black text-[#ffd36b]">{commissionLoading ? "Đang tải..." : formatCurrency(commissionTotal)}</h3>
+                </div>
+                <div className="rounded-2xl bg-white/10 px-3 py-2 text-right text-xs text-white/80">
+                  <div>Đơn hoàn thành</div>
+                  <div className="font-semibold text-white">{completedOrders.length}</div>
+                </div>
+              </div>
+              <p className="mt-3 text-sm text-white/75">
+                Chỉ hiển thị cho CTV. Hoa hồng = 10% tổng tiền đơn + thưởng pizza theo nhóm {currentUserGroup === "vip" ? "VIP 8%" : "thường 5%"}.
+              </p>
             </section>
           </aside>
         </div>
@@ -438,6 +413,13 @@ export default function CtvCreateOrderPage() {
               Lưu đơn hàng
             </button>
           </div>
+
+          <section className="rounded-[24px] bg-[#1f2937] p-4 text-white shadow-[0_10px_30px_rgba(17,24,39,0.12)] ring-1 ring-black/5">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/60">Hoa hồng tạm tính</p>
+            <div className="mt-1 text-2xl font-black text-[#ffd36b]">
+              {commissionLoading ? "Đang tải..." : formatCurrency(commissionTotal)}
+            </div>
+          </section>
         </div>
       </div>
     </div>

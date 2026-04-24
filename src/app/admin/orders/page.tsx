@@ -12,12 +12,13 @@ import {
   MoreVertical,
   Truck,
   UtensilsCrossed,
+  X,
 } from "lucide-react";
-import { collection, doc, onSnapshot, orderBy, query, updateDoc } from "firebase/firestore";
+import { collection, doc, onSnapshot, updateDoc } from "firebase/firestore";
 
 import { db } from "@/app/lib/firebase";
 
-type OrderStatus = "Chờ xử lý" | "Đang nấu" | "Đang giao" | "Hoàn thành" | "Đã hủy";
+type OrderStatus = "Chờ xử lý" | "Đang chế biến" | "Đang giao hàng" | "Hoàn tất" | "Đã hủy";
 type FilterKey = "Tất cả" | OrderStatus;
 
 type OrderItem = {
@@ -29,18 +30,21 @@ type OrderItem = {
   category?: string;
 };
 
+type Customer = {
+  ten?: string;
+  sdt?: string;
+  dia_chi?: string;
+  ghi_chu?: string;
+};
+
 type Order = {
   id: string;
-  khach_hang?: {
-    ten?: string;
-    sdt?: string;
-    dia_chi?: string;
-    ghi_chu?: string;
-  };
+  khach_hang?: Customer;
   danh_sach_mon?: OrderItem[];
   tong_tien?: number;
   trang_thai?: OrderStatus;
   nguoi_tao?: string | null;
+  shipper?: string | null;
   thoi_gian_tao?: { seconds: number; nanoseconds: number } | null;
 };
 
@@ -50,19 +54,23 @@ type StatusMeta = {
   icon: ComponentType<{ className?: string }>;
 };
 
-const statusOptions: OrderStatus[] = ["Chờ xử lý", "Đang nấu", "Đang giao", "Hoàn thành", "Đã hủy"];
+const statusOptions: OrderStatus[] = ["Chờ xử lý", "Đang chế biến", "Đang giao hàng", "Hoàn tất", "Đã hủy"];
 const filters: FilterKey[] = ["Tất cả", ...statusOptions];
 
 const statusMeta: Record<OrderStatus, StatusMeta> = {
   "Chờ xử lý": { label: "Chờ xử lý", className: "bg-amber-50 text-amber-700 ring-1 ring-amber-200", icon: Clock },
-  "Đang nấu": { label: "Đang nấu", className: "bg-sky-50 text-sky-700 ring-1 ring-sky-200", icon: UtensilsCrossed },
-  "Đang giao": { label: "Đang giao", className: "bg-violet-50 text-violet-700 ring-1 ring-violet-200", icon: Truck },
-  "Hoàn thành": { label: "Hoàn thành", className: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200", icon: CheckCircle },
+  "Đang chế biến": { label: "Đang chế biến", className: "bg-sky-50 text-sky-700 ring-1 ring-sky-200", icon: UtensilsCrossed },
+  "Đang giao hàng": { label: "Đang giao hàng", className: "bg-violet-50 text-violet-700 ring-1 ring-violet-200", icon: Truck },
+  "Hoàn tất": { label: "Hoàn tất", className: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200", icon: CheckCircle },
   "Đã hủy": { label: "Đã hủy", className: "bg-rose-50 text-rose-700 ring-1 ring-rose-200", icon: CircleX },
 };
 
 function formatCurrency(value?: number) {
-  return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(value ?? 0);
+  return new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
+    maximumFractionDigits: 0,
+  }).format(value ?? 0);
 }
 
 function formatDateTime(timestamp?: { seconds: number; nanoseconds: number } | null) {
@@ -77,16 +85,24 @@ function formatDateTime(timestamp?: { seconds: number; nanoseconds: number } | n
   }).format(date);
 }
 
+function getTimestampValue(timestamp?: { seconds: number; nanoseconds: number } | null) {
+  return timestamp ? timestamp.seconds * 1000 + Math.floor(timestamp.nanoseconds / 1_000_000) : 0;
+}
+
 export default function AdminOrdersPage() {
   const [activeFilter, setActiveFilter] = useState<FilterKey>("Tất cả");
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [shipperDraft, setShipperDraft] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    const q = query(collection(db, "orders"), orderBy("thoi_gian_tao", "desc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const nextOrders = snapshot.docs.map((document) => ({ id: document.id, ...(document.data() as Omit<Order, "id">) }));
+    const unsubscribe = onSnapshot(collection(db, "orders"), (snapshot) => {
+      const nextOrders = snapshot.docs
+        .map((document) => ({ id: document.id, ...(document.data() as Omit<Order, "id">) }))
+        .sort((a, b) => getTimestampValue(b.thoi_gian_tao) - getTimestampValue(a.thoi_gian_tao));
+
       setOrders(nextOrders);
       setSelectedOrder((current) => {
         if (!current) return current;
@@ -99,23 +115,41 @@ export default function AdminOrdersPage() {
 
   const filteredOrders = useMemo(() => {
     if (activeFilter === "Tất cả") return orders;
-    return orders.filter((order) => order.trang_thai === activeFilter);
+    return orders.filter((order) => (order.trang_thai ?? "Chờ xử lý") === activeFilter);
   }, [activeFilter, orders]);
 
   const summary = useMemo(() => {
     return orders.reduce(
       (acc, order) => {
         const status = order.trang_thai ?? "Chờ xử lý";
+        acc.total += 1;
         acc[status] += 1;
         return acc;
       },
-      { "Chờ xử lý": 0, "Đang nấu": 0, "Đang giao": 0, "Hoàn thành": 0, "Đã hủy": 0 } as Record<OrderStatus, number>,
+      { total: 0, "Chờ xử lý": 0, "Đang chế biến": 0, "Đang giao hàng": 0, "Hoàn tất": 0, "Đã hủy": 0 } as Record<"total" | OrderStatus, number>,
     );
   }, [orders]);
 
   async function updateStatus(orderId: string, status: OrderStatus) {
-    await updateDoc(doc(db, "orders", orderId), { trang_thai: status });
-    setOpenMenuId(null);
+    setIsSaving(true);
+    try {
+      await updateDoc(doc(db, "orders", orderId), { trang_thai: status });
+      setOpenMenuId(null);
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function assignShipper(orderId: string) {
+    setIsSaving(true);
+    try {
+      await updateDoc(doc(db, "orders", orderId), {
+        shipper: shipperDraft.trim() || null,
+      });
+      setShipperDraft("");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   return (
@@ -125,18 +159,16 @@ export default function AdminOrdersPage() {
           <div className="space-y-2">
             <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#b18a83]">Quản lý đơn hàng</p>
             <h1 className="text-[1.7rem] font-black tracking-tight text-[#241615] sm:text-[2rem] lg:text-[2.35rem]">Danh sách đơn hàng</h1>
-            <p className="max-w-2xl text-sm leading-6 text-[#9a7d77] sm:text-base">
-              Dữ liệu cập nhật liên tục
-            </p>
+            <p className="max-w-2xl text-sm leading-6 text-[#9a7d77] sm:text-base">Dữ liệu cập nhật liên tục</p>
           </div>
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
             {[
-              { label: "Tổng đơn", value: orders.length },
+              { label: "Tổng đơn", value: summary.total },
               { label: "Chờ xử lý", value: summary["Chờ xử lý"] },
-              { label: "Đang nấu", value: summary["Đang nấu"] },
-              { label: "Đang giao", value: summary["Đang giao"] },
-              { label: "Hoàn thành", value: summary["Hoàn thành"] },
+              { label: "Đang chế biến", value: summary["Đang chế biến"] },
+              { label: "Đang giao hàng", value: summary["Đang giao hàng"] },
+              { label: "Hoàn tất", value: summary["Hoàn tất"] },
             ].map((item) => (
               <div key={item.label} className="rounded-[22px] border border-[#f0e3df] bg-white px-4 py-4 shadow-[0_8px_22px_rgba(97,39,25,0.04)]">
                 <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#a88d86]">{item.label}</div>
@@ -158,7 +190,16 @@ export default function AdminOrdersPage() {
             {filters.map((filter) => {
               const active = activeFilter === filter;
               return (
-                <button key={filter} type="button" onClick={() => setActiveFilter(filter)} className={`shrink-0 rounded-full px-4 py-2.5 text-sm font-semibold transition ${active ? "bg-[#c62828] text-white shadow-[0_10px_22px_rgba(198,40,40,0.22)]" : "bg-[#f5f2f1] text-[#6f5a55] hover:bg-[#eee8e6]"}`}>
+                <button
+                  key={filter}
+                  type="button"
+                  onClick={() => setActiveFilter(filter)}
+                  className={`shrink-0 rounded-full px-4 py-2.5 text-sm font-semibold transition ${
+                    active
+                      ? "bg-[#c62828] text-white shadow-[0_10px_22px_rgba(198,40,40,0.22)]"
+                      : "bg-[#f5f2f1] text-[#6f5a55] hover:bg-[#eee8e6]"
+                  }`}
+                >
                   {filter}
                 </button>
               );
@@ -194,7 +235,7 @@ export default function AdminOrdersPage() {
                 const StatusIcon = meta.icon;
                 return (
                   <tr key={order.id} className="cursor-pointer transition hover:bg-[#fffdfc]" onClick={() => setSelectedOrder(order)}>
-                    <td className="px-4 py-4 font-mono text-sm font-bold text-[#c62828]">{order.id}</td>
+                    <td className="px-4 py-4 font-mono text-sm font-bold text-[#c62828]">{order.id.replace(/\D/g, "").slice(-4) ? `DH-${order.id.replace(/\D/g, "").slice(-4)}` : order.id}</td>
                     <td className="px-4 py-4 font-semibold text-[#2a1d1a]">{order.khach_hang?.ten || "Không có tên"}</td>
                     <td className="px-4 py-4 font-black text-[#2a1d1a]">{formatCurrency(order.tong_tien)}</td>
                     <td className="px-4 py-4 text-sm text-[#6f5a55]">{formatDateTime(order.thoi_gian_tao ?? null)}</td>
@@ -206,14 +247,32 @@ export default function AdminOrdersPage() {
                     </td>
                     <td className="px-4 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="relative inline-block text-left">
-                        <button type="button" onClick={() => setOpenMenuId((current) => (current === order.id ? null : order.id))} className="inline-flex items-center gap-2 rounded-xl border border-[#eadad5] bg-white px-3 py-2 text-sm font-semibold text-[#6f5752] transition hover:bg-[#faf6f5]">
+                        <button
+                          type="button"
+                          onClick={() => setOpenMenuId((current) => (current === order.id ? null : order.id))}
+                          className="inline-flex items-center gap-2 rounded-xl border border-[#eadad5] bg-white px-3 py-2 text-sm font-semibold text-[#6f5752] transition hover:bg-[#faf6f5]"
+                        >
                           <MoreVertical className="h-4 w-4" />
                           Điều chỉnh
                         </button>
                         {openMenuId === order.id ? (
                           <div className="absolute right-0 top-full z-20 mt-2 w-48 overflow-hidden rounded-2xl border border-[#eadad5] bg-white shadow-[0_16px_36px_rgba(0,0,0,0.12)]">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedOrder(order)}
+                              className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-[#4d3a35] transition hover:bg-[#fff7f6]"
+                            >
+                              <span>Xem chi tiết</span>
+                              <Eye className="h-4 w-4 text-[#c62828]" />
+                            </button>
                             {statusOptions.map((statusOption) => (
-                              <button key={statusOption} type="button" onClick={() => updateStatus(order.id, statusOption)} className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-[#4d3a35] transition hover:bg-[#fff7f6]">
+                              <button
+                                key={statusOption}
+                                type="button"
+                                disabled={isSaving}
+                                onClick={() => updateStatus(order.id, statusOption)}
+                                className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-[#4d3a35] transition hover:bg-[#fff7f6] disabled:cursor-not-allowed disabled:opacity-60"
+                              >
                                 <span>{statusOption}</span>
                                 <ChevronDown className="h-4 w-4 text-[#c62828]" />
                               </button>
@@ -235,10 +294,14 @@ export default function AdminOrdersPage() {
             const meta = statusMeta[status];
             const StatusIcon = meta.icon;
             return (
-              <article key={order.id} className="rounded-[24px] border border-[#f1e5e1] bg-[#fffdfc] p-4 shadow-[0_10px_24px_rgba(97,39,25,0.04)]" onClick={() => setSelectedOrder(order)}>
+              <article
+                key={order.id}
+                className="rounded-[24px] border border-[#f1e5e1] bg-[#fffdfc] p-4 shadow-[0_10px_24px_rgba(97,39,25,0.04)]"
+                onClick={() => setSelectedOrder(order)}
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 space-y-1">
-                    <p className="font-mono text-sm font-bold text-[#c62828]">{order.id}</p>
+                    <p className="font-mono text-sm font-bold text-[#c62828]">{order.id.replace(/\D/g, "").slice(-4) ? `DH-${order.id.replace(/\D/g, "").slice(-4)}` : order.id}</p>
                     <h3 className="truncate text-base font-extrabold text-[#2a1d1a]">{order.khach_hang?.ten || "Không có tên"}</h3>
                     <p className="text-sm text-[#9f827c]">{formatDateTime(order.thoi_gian_tao ?? null)}</p>
                   </div>
@@ -253,7 +316,14 @@ export default function AdminOrdersPage() {
                     <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#aa9089]">Tổng tiền</p>
                     <p className="mt-1 text-lg font-black text-[#241615]">{formatCurrency(order.tong_tien)}</p>
                   </div>
-                  <button type="button" onClick={(e) => { e.stopPropagation(); setOpenMenuId((current) => (current === order.id ? null : order.id)); }} className="inline-flex items-center gap-2 rounded-xl border border-[#eadad5] bg-white px-3 py-2 text-sm font-semibold text-[#6f5752] transition hover:bg-[#faf6f5]">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenMenuId((current) => (current === order.id ? null : order.id));
+                    }}
+                    className="inline-flex items-center gap-2 rounded-xl border border-[#eadad5] bg-white px-3 py-2 text-sm font-semibold text-[#6f5752] transition hover:bg-[#faf6f5]"
+                  >
                     <Eye className="h-4 w-4" />
                     Xem / Sửa
                   </button>
@@ -261,8 +331,27 @@ export default function AdminOrdersPage() {
 
                 {openMenuId === order.id ? (
                   <div className="mt-3 grid gap-2 rounded-2xl border border-[#eadad5] bg-white p-3">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedOrder(order);
+                      }}
+                      className="rounded-xl px-3 py-2 text-left text-sm font-semibold text-[#4d3a35] transition hover:bg-[#fff7f6]"
+                    >
+                      Xem chi tiết
+                    </button>
                     {statusOptions.map((statusOption) => (
-                      <button key={statusOption} type="button" onClick={(e) => { e.stopPropagation(); updateStatus(order.id, statusOption); }} className="rounded-xl px-3 py-2 text-left text-sm font-semibold text-[#4d3a35] transition hover:bg-[#fff7f6]">
+                      <button
+                        key={statusOption}
+                        type="button"
+                        disabled={isSaving}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          updateStatus(order.id, statusOption);
+                        }}
+                        className="rounded-xl px-3 py-2 text-left text-sm font-semibold text-[#4d3a35] transition hover:bg-[#fff7f6] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
                         {statusOption}
                       </button>
                     ))}
@@ -286,27 +375,109 @@ export default function AdminOrdersPage() {
                 <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#b28b84]">Chi tiết đơn hàng</p>
                 <h2 className="mt-1 text-xl font-black text-[#241615]">{selectedOrder.id}</h2>
               </div>
-              <button type="button" onClick={() => setSelectedOrder(null)} className="rounded-full border border-[#eadad5] px-3 py-2 text-sm font-semibold text-[#6f5752] transition hover:bg-[#faf6f5]">Đóng</button>
+              <button
+                type="button"
+                onClick={() => setSelectedOrder(null)}
+                className="inline-flex items-center gap-2 rounded-full border border-[#eadad5] px-3 py-2 text-sm font-semibold text-[#6f5752] transition hover:bg-[#faf6f5]"
+              >
+                <X className="h-4 w-4" />
+                Đóng
+              </button>
             </div>
 
             <div className="grid gap-5 px-5 py-5 sm:px-6">
               <div className="grid gap-3 rounded-[24px] bg-[#fffaf9] p-4 ring-1 ring-[#f1e5e1] sm:grid-cols-2">
-                <div><p className="text-xs font-bold uppercase tracking-[0.16em] text-[#a78b85]">Khách hàng</p><p className="mt-1 font-semibold text-[#2a1d1a]">{selectedOrder.khach_hang?.ten || "Không có tên"}</p></div>
-                <div><p className="text-xs font-bold uppercase tracking-[0.16em] text-[#a78b85]">SĐT</p><p className="mt-1 font-semibold text-[#2a1d1a]">{selectedOrder.khach_hang?.sdt || "N/A"}</p></div>
-                <div className="sm:col-span-2"><p className="text-xs font-bold uppercase tracking-[0.16em] text-[#a78b85]">Địa chỉ</p><p className="mt-1 font-semibold text-[#2a1d1a]">{selectedOrder.khach_hang?.dia_chi || "N/A"}</p></div>
-                <div className="sm:col-span-2"><p className="text-xs font-bold uppercase tracking-[0.16em] text-[#a78b85]">Ghi chú</p><p className="mt-1 font-semibold text-[#2a1d1a]">{selectedOrder.khach_hang?.ghi_chu || "Không có ghi chú"}</p></div>
-                <div><p className="text-xs font-bold uppercase tracking-[0.16em] text-[#a78b85]">Tổng tiền</p><p className="mt-1 text-lg font-black text-[#c62828]">{formatCurrency(selectedOrder.tong_tien)}</p></div>
-                <div><p className="text-xs font-bold uppercase tracking-[0.16em] text-[#a78b85]">Thời gian đặt</p><p className="mt-1 font-semibold text-[#2a1d1a]">{formatDateTime(selectedOrder.thoi_gian_tao ?? null)}</p></div>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#a78b85]">Khách hàng</p>
+                  <p className="mt-1 font-semibold text-[#2a1d1a]">{selectedOrder.khach_hang?.ten || "Không có tên"}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#a78b85]">SĐT</p>
+                  <p className="mt-1 font-semibold text-[#2a1d1a]">{selectedOrder.khach_hang?.sdt || "N/A"}</p>
+                </div>
+                <div className="sm:col-span-2">
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#a78b85]">Địa chỉ</p>
+                  <p className="mt-1 font-semibold text-[#2a1d1a]">{selectedOrder.khach_hang?.dia_chi || "N/A"}</p>
+                </div>
+                <div className="sm:col-span-2">
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#a78b85]">Ghi chú</p>
+                  <p className="mt-1 font-semibold text-[#2a1d1a]">{selectedOrder.khach_hang?.ghi_chu || "Không có ghi chú"}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#a78b85]">Tổng tiền</p>
+                  <p className="mt-1 text-lg font-black text-[#c62828]">{formatCurrency(selectedOrder.tong_tien)}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#a78b85]">Thời gian đặt</p>
+                  <p className="mt-1 font-semibold text-[#2a1d1a]">{formatDateTime(selectedOrder.thoi_gian_tao ?? null)}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#a78b85]">Trạng thái</p>
+                  <p className="mt-1 font-semibold text-[#2a1d1a]">{selectedOrder.trang_thai ?? "Chờ xử lý"}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#a78b85]">Shipper</p>
+                  <p className="mt-1 font-semibold text-[#2a1d1a]">{selectedOrder.shipper || "Chưa gán"}</p>
+                </div>
+              </div>
+
+              <div className="grid gap-4 rounded-[24px] border border-[#f1e5e1] bg-white p-4">
+                <div className="flex items-center gap-2">
+                  <Eye className="h-4 w-4 text-[#c62828]" />
+                  <h3 className="text-base font-bold text-[#2a1d1a]">Điều chỉnh đơn hàng</h3>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="grid gap-2">
+                    <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#a78b85]">Đổi trạng thái</span>
+                    <select
+                      defaultValue={selectedOrder.trang_thai ?? "Chờ xử lý"}
+                      onChange={(e) => updateStatus(selectedOrder.id, e.target.value as OrderStatus)}
+                      className="rounded-2xl border border-[#eadad5] bg-white px-4 py-3 text-sm font-semibold text-[#2a1d1a] outline-none transition focus:border-[#c62828]"
+                    >
+                      {statusOptions.map((statusOption) => (
+                        <option key={statusOption} value={statusOption}>
+                          {statusOption}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="grid gap-2">
+                    <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#a78b85]">Gán shipper</span>
+                    <div className="flex gap-2">
+                      <input
+                        value={shipperDraft}
+                        onChange={(e) => setShipperDraft(e.target.value)}
+                        placeholder={selectedOrder.shipper || "Tên shipper"}
+                        className="min-w-0 flex-1 rounded-2xl border border-[#eadad5] bg-white px-4 py-3 text-sm font-semibold text-[#2a1d1a] outline-none transition placeholder:text-[#b89a93] focus:border-[#c62828]"
+                      />
+                      <button
+                        type="button"
+                        disabled={isSaving || !shipperDraft.trim()}
+                        onClick={() => assignShipper(selectedOrder.id)}
+                        className="rounded-2xl bg-[#c62828] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#b71f1f] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Lưu
+                      </button>
+                    </div>
+                  </label>
+                </div>
               </div>
 
               <div>
-                <div className="mb-3 flex items-center gap-2"><Eye className="h-4 w-4 text-[#c62828]" /><h3 className="text-base font-bold text-[#2a1d1a]">Danh sách món</h3></div>
+                <div className="mb-3 flex items-center gap-2">
+                  <Eye className="h-4 w-4 text-[#c62828]" />
+                  <h3 className="text-base font-bold text-[#2a1d1a]">Danh sách món</h3>
+                </div>
                 <div className="space-y-3">
                   {(selectedOrder.danh_sach_mon || []).map((item) => (
                     <div key={item.id + item.name} className="flex items-center justify-between rounded-2xl border border-[#f1e5e1] bg-white px-4 py-3">
                       <div>
                         <p className="font-semibold text-[#2a1d1a]">{item.name}</p>
-                        <p className="text-sm text-[#9a7d77]">SL: {item.quantity} • {formatCurrency(item.price)}</p>
+                        <p className="text-sm text-[#9a7d77]">
+                          SL: {item.quantity} • {formatCurrency(item.price)}
+                        </p>
                       </div>
                       <p className="font-black text-[#c62828]">{formatCurrency(item.price * item.quantity)}</p>
                     </div>

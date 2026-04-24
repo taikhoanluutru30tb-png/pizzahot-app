@@ -4,19 +4,13 @@ import Image from "next/image";
 import { useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import {
-  addDoc,
-  collection,
-  serverTimestamp,
-} from "firebase/firestore";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import {
   ArrowLeft,
-  ChevronDown,
   Clock,
   FileText,
   Minus,
   Plus,
-  Search,
   ShoppingBag,
   ShoppingCart,
   Sparkles,
@@ -26,7 +20,8 @@ import {
 } from "lucide-react";
 
 import { auth, db } from "@/app/lib/firebase";
-import { useMenuItems, type MenuItem } from "@/app/lib/use-menu-items";
+import { MenuListSection } from "@/app/components/menu-list-section";
+import { filterAndSortMenuItems, useMenuItems, type MenuItem, type MenuSortKey } from "@/app/lib/use-menu-items";
 
 type CartItem = MenuItem & { quantity: number };
 
@@ -49,9 +44,10 @@ function formatCurrency(value: number) {
 
 export default function StaffCreateOrderPage() {
   const router = useRouter();
-  const { menuItems, categories, error: menuError } = useMenuItems();
+  const { menuItems, categories, error: menuError, loading } = useMenuItems();
   const [activeCategory, setActiveCategory] = useState("Tất cả");
   const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<MenuSortKey>("recommended");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customer, setCustomer] = useState<CustomerForm>({
     ten: "",
@@ -66,15 +62,8 @@ export default function StaffCreateOrderPage() {
 
 
   const visibleProducts = useMemo(() => {
-    const keyword = search.trim().toLowerCase();
-    return menuItems.filter((product) => {
-      const matchesCategory = activeCategory === "Tất cả" || product.category === activeCategory;
-      const matchesSearch =
-        keyword.length === 0 ||
-        [product.name, product.description, product.category].some((value) => value.toLowerCase().includes(keyword));
-      return matchesCategory && matchesSearch;
-    });
-  }, [activeCategory, menuItems, search]);
+    return filterAndSortMenuItems(menuItems, { search, category: activeCategory, sort });
+  }, [activeCategory, menuItems, search, sort]);
 
   const subtotal = useMemo(() => cart.reduce((sum, item) => sum + item.price * item.quantity, 0), [cart]);
   const total = subtotal;
@@ -186,74 +175,24 @@ export default function StaffCreateOrderPage() {
 
       <div className="grid gap-6 lg:grid-cols-[1.35fr_0.85fr]">
         <main className="space-y-6">
-          <section className="rounded-[28px] bg-white p-4 shadow-[0_10px_30px_rgba(17,24,39,0.05)] ring-1 ring-black/5 lg:p-6">
-            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="text-xl font-bold text-[#2b1715]">Thực đơn</h2>
-                <p className="mt-1 text-sm text-[#8b6d67]">Danh sách món ăn được lấy trực tiếp từ Firestore collection `menu`.</p>
-              </div>
-              <div className="hidden items-center gap-2 rounded-full bg-[#fff7f5] px-3 py-2 text-xs font-medium text-[#8b6d67] md:flex">
-                <Clock className="h-4 w-4 text-[#c62828]" />
-                Realtime update
-              </div>
-            </div>
-
-            <div className="mb-4 grid gap-3 md:grid-cols-[1fr_auto]">
-              <label className="flex h-12 items-center gap-3 rounded-2xl border border-[#eadedb] bg-[#fffaf9] px-4 text-sm text-[#7d625d]">
-                <Search className="h-4 w-4 text-[#c62828]" />
-                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm món, ví dụ: Pizza" className="w-full bg-transparent outline-none placeholder:text-[#b99f99]" />
-              </label>
-              <div className="inline-flex items-center justify-between rounded-2xl border border-[#eadedb] bg-[#fffaf9] px-4 py-3 text-sm text-[#7d625d] md:min-w-56">
-                <span>{visibleProducts.length} món</span>
-                <ChevronDown className="h-4 w-4" />
-              </div>
-            </div>
-
-            <div className="mb-5 flex gap-2 overflow-x-auto pb-1">
-              {categories.map((category) => {
-                const isActive = category === activeCategory;
-                return (
-                  <button
-                    key={category}
-                    type="button"
-                    onClick={() => setActiveCategory(category)}
-                    className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition ${
-                      isActive
-                        ? "bg-[#c62828] text-white shadow-lg shadow-[#c62828]/20"
-                        : "bg-[#fff7f6] text-[#7d625d] ring-1 ring-[#f0e3e0] hover:bg-[#fff1ef]"
-                    }`}
-                  >
-                    {category}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
-              {visibleProducts.map((product) => (
-                <article key={product.id} className="group overflow-hidden rounded-[24px] bg-[#fffaf9] ring-1 ring-[#f2e7e4] transition hover:-translate-y-0.5 hover:shadow-[0_16px_36px_rgba(17,24,39,0.08)]">
-                  <div className="relative h-48 overflow-hidden">
-                    <Image src={product.imageUrl} alt={product.name} fill className="object-cover transition duration-500 group-hover:scale-105" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
-                    <span className="absolute left-4 top-4 rounded-full bg-black/65 px-3 py-1 text-xs font-semibold text-white backdrop-blur">{product.category}</span>
-                  </div>
-                  <div className="space-y-3 p-4">
-                    <div>
-                      <h3 className="text-lg font-bold text-[#2b1715]">{product.name}</h3>
-                      <p className="mt-1 text-sm leading-6 text-[#8b6d67]">{product.description || "Không có mô tả"}</p>
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="text-lg font-black text-[#c62828]">{formatCurrency(product.price)}</div>
-                      <button type="button" onClick={() => addToCart(product)} className="inline-flex items-center gap-2 rounded-2xl bg-[#c62828] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#c62828]/20 transition hover:bg-[#a61f1f]">
-                        <Plus className="h-4 w-4" />
-                        Thêm món
-                      </button>
-                    </div>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
+          <MenuListSection
+            title="Thực đơn"
+            subtitle="Danh sách món ăn được lấy trực tiếp từ Firestore collection `menu`."
+            items={visibleProducts}
+            categories={categories}
+            activeCategory={activeCategory}
+            onCategoryChange={(category) => setActiveCategory(category as (typeof categories)[number])}
+            search={search}
+            onSearchChange={setSearch}
+            sort={sort}
+            onSortChange={setSort}
+            countLabel={`${visibleProducts.length} món`}
+            loading={loading}
+            error={menuError}
+            emptyDescription="Chưa có món nào phù hợp."
+            actionLabel="Thêm món"
+            onAction={addToCart}
+          />
         </main>
 
         <aside className="hidden space-y-6 lg:block lg:sticky lg:top-6 lg:self-start">

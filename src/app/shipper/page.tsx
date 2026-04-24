@@ -1,14 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  collection,
-  doc,
-  onSnapshot,
-  orderBy,
-  query,
-  updateDoc,
-} from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
+import { collection, doc, onSnapshot, orderBy, query, updateDoc } from "firebase/firestore";
 import {
   Bell,
   CheckCircle2,
@@ -19,6 +13,7 @@ import {
   Phone,
   Truck,
   UserRound,
+  Loader2,
 } from "lucide-react";
 
 import { auth, db } from "@/app/lib/firebase";
@@ -33,13 +28,16 @@ type OrderDoc = {
   };
   danh_sach_mon?: Array<{
     name?: string;
+    ten_mon?: string;
     quantity?: number;
+    so_luong?: number;
   }>;
   tong_tien?: number;
   trang_thai?: string;
   nguoi_giao?: string;
   thoi_gian_tao?: {
     toDate?: () => Date;
+    seconds?: number;
   };
 };
 
@@ -52,24 +50,42 @@ function formatCurrency(value: number) {
 }
 
 function formatDate(value?: OrderDoc["thoi_gian_tao"]) {
-  if (!value?.toDate) return "Chưa có thời gian";
-  return value.toDate().toLocaleString("vi-VN");
+  if (!value) return "Chưa có thời gian";
+  if (typeof value.toDate === "function") return value.toDate().toLocaleString("vi-VN");
+  if (typeof value.seconds === "number") return new Date(value.seconds * 1000).toLocaleString("vi-VN");
+  return "Chưa có thời gian";
 }
 
-function OrderCard({ order, onComplete }: { order: OrderDoc; onComplete: (orderId: string) => Promise<void> }) {
-  const itemsCount = order.danh_sach_mon?.reduce((sum, item) => sum + (item.quantity ?? 1), 0) ?? 0;
+function getItemName(item: NonNullable<OrderDoc["danh_sach_mon"]>[number]) {
+  return item.ten_mon || item.name || "Món ăn";
+}
+
+function getItemQuantity(item: NonNullable<OrderDoc["danh_sach_mon"]>[number]) {
+  return item.so_luong ?? item.quantity ?? 1;
+}
+
+function OrderCard({
+  order,
+  onComplete,
+  loading,
+}: {
+  order: OrderDoc;
+  onComplete: (orderId: string) => Promise<void>;
+  loading: boolean;
+}) {
+  const itemsCount = order.danh_sach_mon?.reduce((sum, item) => sum + getItemQuantity(item), 0) ?? 0;
   const customerPhone = order.khach_hang?.sdt ?? "";
 
   return (
     <article className="overflow-hidden rounded-[28px] border border-[#f4e3df] bg-white shadow-[0_16px_50px_rgba(17,24,39,0.08)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_60px_rgba(17,24,39,0.12)]">
-      <div className="bg-gradient-to-r from-[#dc2626] via-[#ef4444] to-[#fb923c] px-5 py-4 text-white">
+      <div className="bg-gradient-to-r from-emerald-600 via-green-600 to-teal-500 px-5 py-4 text-white">
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.26em] text-white/90">
               <Truck className="h-3.5 w-3.5" />
-              Đang giao
+              Đang giao hàng
             </div>
-            <h2 className="mt-3 text-2xl font-black tracking-tight">{order.id}</h2>
+            <h2 className="mt-3 text-2xl font-black tracking-tight">{order.id.replace(/\D/g, "").slice(-4) ? `DH-${order.id.replace(/\D/g, "").slice(-4)}` : order.id}</h2>
             <p className="mt-1 text-sm text-white/85">Cập nhật lúc: {formatDate(order.thoi_gian_tao)}</p>
           </div>
 
@@ -83,38 +99,31 @@ function OrderCard({ order, onComplete }: { order: OrderDoc; onComplete: (orderI
         <div className="grid gap-3 sm:grid-cols-[1.2fr_0.8fr] sm:items-stretch">
           <div className="rounded-[22px] bg-[#fff7f5] p-4 ring-1 ring-[#f4e3df]">
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.24em] text-[#9b756f]">
-              <UserRound className="h-4 w-4 text-[#dc2626]" />
+              <UserRound className="h-4 w-4 text-emerald-600" />
               Khách hàng
             </div>
-            <div className="mt-3 space-y-1">
+            <div className="mt-3 space-y-2">
               <p className="text-2xl font-black tracking-tight text-[#3c2b28]">{order.khach_hang?.ten ?? "Khách hàng"}</p>
               <a
                 href={`tel:${customerPhone.replace(/\s/g, "")}`}
                 className="inline-flex items-center gap-2 text-lg font-semibold text-[#5b4541] underline-offset-4 hover:underline"
               >
-                <Phone className="h-4 w-4 text-[#dc2626]" />
+                <Phone className="h-4 w-4 text-emerald-600" />
                 {customerPhone || "Chưa có số điện thoại"}
               </a>
             </div>
           </div>
 
-          <div className="rounded-[22px] bg-[#dc2626] p-4 text-white shadow-[0_12px_30px_rgba(220,38,38,0.18)]">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-white/70">Số tiền cần thu</div>
-                <p className="mt-3 text-4xl font-black tracking-tight">{formatCurrency(order.tong_tien ?? 0)}</p>
-              </div>
-              <Phone className="h-8 w-8 text-white/80" />
-            </div>
-            <div className="mt-4 text-xs font-semibold text-white/75">
-              Món trong đơn: {itemsCount}
-            </div>
+          <div className="rounded-[22px] bg-emerald-600 p-4 text-white shadow-[0_12px_30px_rgba(16,185,129,0.18)]">
+            <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-white/70">Số tiền cần thu</div>
+            <p className="mt-3 text-4xl font-black tracking-tight">{formatCurrency(order.tong_tien ?? 0)}</p>
+            <div className="mt-4 text-xs font-semibold text-white/75">Món trong đơn: {itemsCount}</div>
           </div>
         </div>
 
         <div className="rounded-[22px] bg-[#fffaf9] p-4 ring-1 ring-[#f4e3df]">
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.24em] text-[#9b756f]">
-            <MapPin className="h-4 w-4 text-[#dc2626]" />
+            <MapPin className="h-4 w-4 text-emerald-600" />
             Địa chỉ giao hàng
           </div>
           <p className="mt-3 text-[1.05rem] font-bold leading-relaxed text-[#3f2f2c] sm:text-[1.15rem]">
@@ -122,39 +131,32 @@ function OrderCard({ order, onComplete }: { order: OrderDoc; onComplete: (orderI
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-[#8b6f6a]">
             <span className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 font-medium ring-1 ring-[#eadbd8]">
-              <Navigation2 className="h-3.5 w-3.5 text-[#dc2626]" />
-              {order.id}
+              <Navigation2 className="h-3.5 w-3.5 text-emerald-600" />
+              {order.id.replace(/\D/g, "").slice(-4) ? `DH-${order.id.replace(/\D/g, "").slice(-4)}` : order.id}
             </span>
             <span className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 font-medium ring-1 ring-[#eadbd8]">
-              <CheckCircle2 className="h-3.5 w-3.5 text-[#dc2626]" />
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
               {order.trang_thai ?? "Đang giao"}
             </span>
           </div>
         </div>
 
         <div className="rounded-[22px] bg-white p-4 ring-1 ring-[#f4e3df]">
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-sm font-bold uppercase tracking-[0.24em] text-[#9b756f]">Ghi chú</div>
-          </div>
-          <p className="mt-3 text-[1rem] leading-relaxed text-[#4e3935]">
-            {order.khach_hang?.ghi_chu || "Không có ghi chú"}
-          </p>
+          <div className="text-sm font-bold uppercase tracking-[0.24em] text-[#9b756f]">Ghi chú</div>
+          <p className="mt-3 text-[1rem] leading-relaxed text-[#4e3935]">{order.khach_hang?.ghi_chu || "Không có ghi chú"}</p>
         </div>
 
         <div className="rounded-[22px] bg-white p-4 ring-1 ring-[#f4e3df]">
           <div className="flex items-center justify-between gap-3">
             <div className="text-sm font-bold uppercase tracking-[0.24em] text-[#9b756f]">Danh sách món</div>
-            <span className="rounded-full bg-[#fff1f0] px-3 py-1 text-xs font-bold text-[#dc2626] ring-1 ring-[#fecaca]">
-              {itemsCount} món
-            </span>
+            <span className="rounded-full bg-[#e9f8f1] px-3 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200">{itemsCount} món</span>
           </div>
           <div className="mt-4 space-y-3">
             {(order.danh_sach_mon ?? []).map((item, index) => (
-              <div key={`${item.name ?? index}-${index}`} className="flex items-start justify-between gap-4 border-b border-[#f5e8e6] pb-3 last:border-b-0 last:pb-0">
+              <div key={`${getItemName(item)}-${index}`} className="flex items-start justify-between gap-4 border-b border-[#f5e8e6] pb-3 last:border-b-0 last:pb-0">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[1.02rem] font-semibold text-[#4e3935]">
-                    {item.name ?? "Món ăn"}
-                    {item.quantity && item.quantity > 1 ? ` x${item.quantity}` : ""}
+                    {getItemName(item)}{getItemQuantity(item) > 1 ? ` x${getItemQuantity(item)}` : ""}
                   </p>
                   <p className="mt-1 text-xs text-[#a38c87]">Món {index + 1}</p>
                 </div>
@@ -166,11 +168,12 @@ function OrderCard({ order, onComplete }: { order: OrderDoc; onComplete: (orderI
 
         <button
           type="button"
+          disabled={loading}
           onClick={() => onComplete(order.id)}
-          className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#dc2626] px-4 py-4 text-base font-black text-white shadow-[0_14px_30px_rgba(220,38,38,0.22)] transition hover:bg-[#b91c1c] active:scale-[0.99] sm:min-h-[60px]"
+          className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 py-4 text-base font-black text-white shadow-[0_14px_30px_rgba(16,185,129,0.22)] transition hover:bg-emerald-700 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-[60px]"
         >
-          <CheckCircle2 className="h-5 w-5" />
-          Đã giao xong
+          {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <CheckCircle2 className="h-5 w-5" />}
+          {loading ? "Đang xử lý..." : "Đã giao xong"}
         </button>
       </div>
     </article>
@@ -179,82 +182,103 @@ function OrderCard({ order, onComplete }: { order: OrderDoc; onComplete: (orderI
 
 export default function ShipperTransitPage() {
   const [orders, setOrders] = useState<OrderDoc[]>([]);
-  const [message, setMessage] = useState<string | null>(null);
+  const [currentUid, setCurrentUid] = useState<string | null>(null);
+  const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const currentUserLabel = auth.currentUser?.displayName || auth.currentUser?.uid || "Shipper";
 
   useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUid(user?.uid ?? null);
+    });
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    if (!currentUid) {
+      setOrders([]);
+      return;
+    }
+
     const q = query(collection(db, "orders"), orderBy("thoi_gian_tao", "desc"));
     return onSnapshot(
       q,
       (snapshot) => {
-        const items = snapshot.docs.map((document) => ({ id: document.id, ...document.data() } as OrderDoc));
-        setOrders(
-          items.filter((order) => {
-            const assignedTo = String(order.nguoi_giao ?? "");
-            return order.trang_thai === "Đang giao" && (!assignedTo || assignedTo === currentUserLabel || assignedTo === auth.currentUser?.uid);
-          }),
-        );
+        const items = snapshot.docs.map((document) => ({ id: document.id, ...(document.data() as Omit<OrderDoc, "id">) }));
+        setOrders(items.filter((order) => order.trang_thai === "Đang giao hàng" && order.nguoi_giao === currentUid));
       },
-      (snapshotError) => setError(snapshotError.message || "Không thể tải đơn hàng đang giao."),
+      (snapshotError) => {
+        console.error("Failed to subscribe to shipper orders:", snapshotError);
+        setError("Không thể tải danh sách đơn hàng đang giao.");
+      },
     );
-  }, [currentUserLabel]);
+  }, [currentUid]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(null), 3000);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
 
   async function handleComplete(orderId: string) {
+    if (updatingOrderId) return;
     setError(null);
-    setMessage(null);
+    setToast(null);
+    setUpdatingOrderId(orderId);
 
     try {
-      await updateDoc(doc(db, "orders", orderId), {
-        trang_thai: "Hoàn thành",
-      });
-      setMessage("Chúc mừng! Đơn hàng đã được cập nhật hoàn thành.");
+      await updateDoc(doc(db, "orders", orderId), { trang_thai: "Hoàn tất" });
+      setToast("Đơn hàng đã được giao xong.");
     } catch (completeError) {
-      setError(completeError instanceof Error ? completeError.message : "Không thể cập nhật trạng thái đơn hàng.");
+      console.error("Failed to complete delivery:", completeError);
+      setError("Không thể cập nhật trạng thái đơn hàng. Vui lòng thử lại.");
+    } finally {
+      setUpdatingOrderId(null);
     }
   }
 
-  const totalOrders = orders.length;
+  const currentUserLabel = auth.currentUser?.displayName || currentUid || "Shipper";
 
   return (
-    <div className="space-y-6 pb-4">
-      <section className="overflow-hidden rounded-[32px] bg-gradient-to-br from-[#fff7f5] via-white to-[#fff1ee] p-5 shadow-[0_16px_50px_rgba(17,24,39,0.05)] ring-1 ring-[#f3e1dd] sm:p-6">
+    <div className="space-y-6 pb-6 text-[#241615]">
+      {toast ? <div className="fixed right-4 top-4 z-50 rounded-2xl bg-[#0f172a] px-4 py-3 text-sm font-medium text-white shadow-xl">{toast}</div> : null}
+
+      <section className="overflow-hidden rounded-[32px] bg-gradient-to-br from-[#f0fdf4] via-white to-[#ecfdf5] p-5 shadow-[0_16px_50px_rgba(17,24,39,0.05)] ring-1 ring-[#dbeee5] sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full bg-[#fff1f0] px-3 py-1 text-xs font-bold uppercase tracking-[0.28em] text-[#dc2626] ring-1 ring-[#fecaca]">
+            <div className="inline-flex items-center gap-2 rounded-full bg-[#e9f8f1] px-3 py-1 text-xs font-bold uppercase tracking-[0.28em] text-emerald-700 ring-1 ring-emerald-200">
               <Bell className="h-3.5 w-3.5" />
-              Trang điều phối
+              Trang điều phối shipper
             </div>
-            <h1 className="mt-4 text-3xl font-black tracking-tight text-[#3f2f2c] sm:text-5xl">Đơn hàng đang giao</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-[#7f625d] sm:text-base">
-              Danh sách đơn được lọc tự động. Khi bấm “Đã giao xong”, trạng thái sẽ chuyển sang Hoàn thành và đơn sẽ tự biến mất khỏi màn hình.
+            <h1 className="mt-4 text-3xl font-black tracking-tight text-[#163020] sm:text-5xl">Đơn hàng cần giao</h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-[#51705f] sm:text-base">
+              Chỉ hiển thị các đơn có trạng thái <strong>Đang giao</strong> và được gán cho shipper hiện tại.
             </p>
           </div>
 
           <div className="grid grid-cols-2 gap-3 sm:min-w-[320px]">
-            <div className="rounded-3xl bg-white p-4 ring-1 ring-[#f2dfdb]">
-              <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#9b756f]">Tổng đơn</p>
-              <p className="mt-2 text-3xl font-black text-[#dc2626]">{totalOrders}</p>
+            <div className="rounded-3xl bg-white p-4 ring-1 ring-[#dbeee5]">
+              <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#779084]">Tổng đơn</p>
+              <p className="mt-2 text-3xl font-black text-emerald-700">{orders.length}</p>
             </div>
-            <div className="rounded-3xl bg-white p-4 ring-1 ring-[#f2dfdb]">
-              <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#9b756f]">Tài khoản</p>
-              <p className="mt-2 truncate text-lg font-black text-[#3f2f2c]">{currentUserLabel}</p>
+            <div className="rounded-3xl bg-white p-4 ring-1 ring-[#dbeee5]">
+              <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#779084]">Tài khoản</p>
+              <p className="mt-2 truncate text-lg font-black text-[#163020]">{currentUserLabel}</p>
             </div>
           </div>
         </div>
       </section>
 
       {error ? <div className="rounded-2xl border border-[#f2d1d1] bg-[#fff7f7] px-4 py-3 text-sm font-medium text-[#b42318]">{error}</div> : null}
-      {message ? <div className="rounded-2xl border border-[#d9f0df] bg-[#f3fbf5] px-4 py-3 text-sm font-medium text-[#1f7a39]">{message}</div> : null}
 
       {orders.length === 0 ? (
-        <div className="rounded-[28px] border border-dashed border-[#eadbd7] bg-white px-5 py-12 text-center text-[#8a6d68] shadow-[0_16px_50px_rgba(17,24,39,0.05)]">
+        <div className="rounded-[28px] border border-dashed border-[#dbeee5] bg-white px-5 py-12 text-center text-[#5f7569] shadow-[0_16px_50px_rgba(17,24,39,0.05)]">
           Hiện chưa có đơn nào đang giao cho bạn.
         </div>
       ) : (
         <section className="grid gap-5 md:grid-cols-2">
           {orders.map((order) => (
-            <OrderCard key={order.id} order={order} onComplete={handleComplete} />
+            <OrderCard key={order.id} order={order} onComplete={handleComplete} loading={updatingOrderId === order.id} />
           ))}
         </section>
       )}
