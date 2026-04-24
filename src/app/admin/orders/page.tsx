@@ -3,13 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ComponentType } from "react";
 import {
-  ChevronDown,
   CheckCircle,
   CircleX,
   Clock,
   Eye,
   Filter,
-  MoreVertical,
+  Package,
+  Pencil,
   Truck,
   UtensilsCrossed,
   X,
@@ -164,8 +164,7 @@ export default function AdminOrdersPage() {
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
             {[
-              { label: "Tổng đơn", value: summary.total },
-              { label: "Chờ xử lý", value: summary["Chờ xử lý"] },
+              { label: "Tất cả", value: summary.total },
               { label: "Đang chế biến", value: summary["Đang chế biến"] },
               { label: "Đang giao hàng", value: summary["Đang giao hàng"] },
               { label: "Hoàn tất", value: summary["Hoàn tất"] },
@@ -252,7 +251,7 @@ export default function AdminOrdersPage() {
                           onClick={() => setOpenMenuId((current) => (current === order.id ? null : order.id))}
                           className="inline-flex items-center gap-2 rounded-xl border border-[#eadad5] bg-white px-3 py-2 text-sm font-semibold text-[#6f5752] transition hover:bg-[#faf6f5]"
                         >
-                          <MoreVertical className="h-4 w-4" />
+                          <Pencil className="h-4 w-4" />
                           Điều chỉnh
                         </button>
                         {openMenuId === order.id ? (
@@ -274,7 +273,7 @@ export default function AdminOrdersPage() {
                                 className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-[#4d3a35] transition hover:bg-[#fff7f6] disabled:cursor-not-allowed disabled:opacity-60"
                               >
                                 <span>{statusOption}</span>
-                                <ChevronDown className="h-4 w-4 text-[#c62828]" />
+                                <Package className="h-4 w-4 text-[#c62828]" />
                               </button>
                             ))}
                           </div>

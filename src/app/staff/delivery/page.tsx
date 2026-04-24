@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useMemo, useState } from "react";
 import {
   CheckCircle2,
@@ -283,7 +284,7 @@ export default function StaffDeliveryPage() {
                   >
                     <div className="flex items-center gap-3">
                       <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full bg-[#f7eee9]">
-                        <img src={shipper.avatar} alt={shipper.name} className="h-full w-full object-cover" />
+                        <Image src={shipper.avatar} alt={shipper.name} fill className="object-cover" sizes="48px" />
                         <span className="absolute bottom-0.5 right-0.5 h-3.5 w-3.5 rounded-full bg-emerald-500 ring-2 ring-white" />
                       </div>
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { BellRing, BriefcaseBusiness, CalendarClock, Check, Clock, DollarSign, Gauge, Save, ShieldAlert, Smartphone } from "lucide-react";
+import { BellRing, BriefcaseBusiness, CalendarClock, Check, Clock, Gauge, Save, ShieldAlert, Smartphone } from "lucide-react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 
 import { db } from "@/app/lib/firebase";
@@ -198,9 +198,9 @@ export default function TimekeepingPage() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#b08d85]">Thiết lập chấm công</p>
-            <h1 className="mt-2 text-[1.9rem] font-black tracking-tight text-[#231714] lg:text-[2.5rem]">Cấu hình ca làm và quy định chấm công</h1>
+            <h1 className="mt-2 text-[1.9rem] font-black tracking-tight text-[#231714] lg:text-[2.5rem]">Cấu hình 4 ca làm và quy định đi muộn</h1>
             <p className="mt-2 max-w-3xl text-sm text-[#9f827c] lg:text-base">
-              Dữ liệu được đồng bộ từ Firestore để áp dụng ngay cho 4 ca làm và quy định đi muộn của toàn hệ thống.
+              Chuẩn bị dữ liệu cho 4 ca làm, mức lương theo giờ và chính sách phạt đi muộn của toàn hệ thống.
             </p>
           </div>
 
@@ -247,7 +247,7 @@ export default function TimekeepingPage() {
                       </div>
                     </div>
 
-                    <div className="grid gap-4 md:grid-cols-3">
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                       <div>
                         <FieldLabel>Giờ bắt đầu</FieldLabel>
                         <div className="relative">

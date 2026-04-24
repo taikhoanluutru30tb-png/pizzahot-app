@@ -2,22 +2,20 @@
 
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { auth, getAccessDeniedMessage, getDisplayName, loadCurrentUserRole, canAccessWorkspace, getWorkspaceFromPath } from "../lib/role-guard";
 import {
-  ChevronRight,
+  ArrowRight,
+  Edit,
   Home,
   LogOut,
-  MessageSquare,
-  ShoppingBag,
-  SquarePen,
+  MessageCircle,
+  Package,
+  User as UserIcon,
   UserRound,
-  UserRoundPen,
 } from "lucide-react";
-import { auth, db } from "../lib/firebase";
 
 type NavItem = {
   label: string;
@@ -26,38 +24,17 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { label: "Trang chủ", href: "/ctv", icon: Home },
-  { label: "Tạo đơn hàng", href: "/ctv/create-order", icon: SquarePen },
-  { label: "Lịch sử đơn hàng", href: "/ctv/orders", icon: ShoppingBag },
-  { label: "Tin nhắn", href: "/ctv/message", icon: MessageSquare },
-  { label: "Hồ sơ", href: "/ctv/profile", icon: UserRoundPen },
+  { label: "Tạo đơn hàng", href: "/ctv/create-order", icon: Edit },
+  { label: "Đơn hàng của tôi", href: "/ctv/orders", icon: Package },
+  { label: "Báo cáo thu nhập", href: "/ctv/message", icon: MessageCircle },
+  { label: "Hồ sơ cá nhân", href: "/ctv/profile", icon: UserRound },
 ];
-
-const ROLE_LABELS: Record<string, string> = {
-  ctv: "CTV",
-  tech_support: "Hỗ trợ kỹ thuật",
-};
-
-function getDisplayName(user: User, userData: Record<string, unknown> | undefined) {
-  const candidates = [
-    userData?.fullName,
-    userData?.displayName,
-    userData?.name,
-    user.displayName,
-    user.email,
-  ];
-
-  const found = candidates.find((value): value is string => typeof value === "string" && value.trim().length > 0);
-  return found ?? "Tài khoản đăng nhập";
-}
-
 
 export default function CtvLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [loading, setLoading] = useState(true);
   const [displayName, setDisplayName] = useState("Tài khoản đăng nhập");
-  const [roleLabel, setRoleLabel] = useState(ROLE_LABELS.ctv);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
@@ -68,19 +45,17 @@ export default function CtvLayout({ children }: { children: ReactNode }) {
       }
 
       try {
-        const userSnap = await getDoc(doc(db, "users", user.uid));
-        const userData = userSnap.data() as Record<string, unknown> | undefined;
-        const role = userData?.role;
+        const { snapshot, data, role } = await loadCurrentUserRole(user.uid);
+        const workspace = getWorkspaceFromPath(pathname);
 
-        if (!userSnap.exists() || (role !== "ctv" && role !== "tech_support")) {
+        if (!snapshot.exists() || !canAccessWorkspace(role, workspace)) {
           await signOut(auth);
           setLoading(false);
-          router.replace("/");
+          router.replace("/?message=" + encodeURIComponent(getAccessDeniedMessage()));
           return;
         }
 
-        setDisplayName(getDisplayName(user, userData));
-        setRoleLabel(ROLE_LABELS[String(role)] ?? ROLE_LABELS.ctv);
+        setDisplayName(getDisplayName(user, data));
         setLoading(false);
       } catch {
         await signOut(auth);
@@ -90,7 +65,7 @@ export default function CtvLayout({ children }: { children: ReactNode }) {
     });
 
     return () => unsubscribe();
-  }, [router]);
+  }, [pathname, router]);
 
   if (loading) {
     return (
@@ -108,7 +83,7 @@ export default function CtvLayout({ children }: { children: ReactNode }) {
       <aside className="fixed inset-y-0 left-0 hidden w-[292px] flex-col border-r border-[#2a0d0d] bg-[#070707] px-5 py-6 text-white shadow-[10px_0_40px_rgba(0,0,0,0.22)] lg:flex">
         <div className="px-2 text-center">
           <h1 className="text-4xl font-extrabold tracking-tight text-[#dc2626]">Pizza Hot</h1>
-          <p className="mt-1 text-sm text-[#d7b6b1]">CTV</p>
+          <p className="mt-1 text-sm text-[#d7b6b1]">Đối tác bán hàng</p>
         </div>
 
         <nav className="mt-8 flex-1 space-y-4 overflow-y-auto pr-1">
@@ -126,7 +101,7 @@ export default function CtvLayout({ children }: { children: ReactNode }) {
                   <Icon className="h-5 w-5 shrink-0" />
                   <span>{item.label}</span>
                 </span>
-                <ChevronRight className="h-4 w-4 opacity-70" />
+                <ArrowRight className="h-4 w-4 opacity-70" />
               </Link>
             );
           })}
@@ -134,20 +109,14 @@ export default function CtvLayout({ children }: { children: ReactNode }) {
 
         <div className="mt-6 rounded-[24px] bg-[#121212] p-4 shadow-inner shadow-black/30 ring-1 ring-white/5">
           <div className="flex items-center gap-3">
-            <div className="grid h-14 w-14 place-items-center overflow-hidden rounded-full bg-[#dc2626] text-white">
-              <Image
-                src="/avatar-sidebar.png"
-                alt="Ảnh đại diện"
-                width={56}
-                height={56}
-                className="h-full w-full object-cover"
-              />
+            <div className="grid h-14 w-14 place-items-center rounded-full bg-[#dc2626] text-white">
+              <UserIcon className="h-7 w-7" />
             </div>
             <div className="min-w-0">
               <div className="truncate text-lg font-bold text-[#f0cec9]" title={displayName}>
-                {displayName}
+                Xin chào, {displayName}
               </div>
-              <div className="text-sm text-[#9f817d]">{roleLabel}</div>
+              <div className="text-sm text-[#9f817d]">Vị trí: Đối tác bán hàng</div>
             </div>
           </div>
           <div className="mt-4 flex gap-3">

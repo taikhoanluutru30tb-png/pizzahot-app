@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useState } from "react";
-import { Camera, Check, Edit, Mail, Phone, User2 } from "lucide-react";
+import { Camera, Edit, Mail, Phone, ShieldCheck, User, User2 } from "lucide-react";
 
 type ProfileForm = {
   fullName: string;
@@ -18,10 +18,9 @@ const initialProfile: ProfileForm = {
   bankAccount: "0123456789",
 };
 
-export default function CtvProfilePage() {
+export default function StaffProfilePage() {
   const [form, setForm] = useState<ProfileForm>(initialProfile);
   const [isEditing, setIsEditing] = useState(false);
-
 
   const handleChange = (field: keyof ProfileForm, value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -79,7 +78,7 @@ export default function CtvProfilePage() {
                 <h2 className="text-xl font-extrabold tracking-tight text-[#3b2420]">
                   {form.fullName}
                 </h2>
-                <p className="text-sm font-medium text-[#9b7a73]">Quản trị viên</p>
+                <p className="text-sm font-medium text-[#9b7a73]">Vị trí: Nhân viên</p>
               </div>
 
               <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#fff4f2] px-3 py-2 text-xs font-bold uppercase tracking-[0.18em] text-[#b84f46]">
@@ -92,8 +91,9 @@ export default function CtvProfilePage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Họ và tên" icon={User2} value={form.fullName} onChange={(value) => handleChange("fullName", value)} disabled={!isEditing} placeholder="Tên nhân viên" />
                 <Field label="Số điện thoại" icon={Phone} value={form.phone} onChange={(value) => handleChange("phone", value)} disabled={!isEditing} placeholder="Số điện thoại" />
-                <Field label="Email" icon={Mail} value={form.email} onChange={(value) => handleChange("email", value)} disabled={!isEditing} placeholder="tennhanvien@pizzahot.com" />
-                <Field label="Số tài khoản ngân hàng" icon={Check} value={form.bankAccount} onChange={(value) => handleChange("bankAccount", value)} disabled={!isEditing} placeholder="Số tài khoản để nhận lương/hoa hồng" />
+                <Field label="Email" icon={Mail} value={form.email} onChange={(value) => handleChange("email", value)} disabled placeholder="tennhanvien@pizzahot.com" />
+                <Field label="Vị trí công tác" icon={User} value="Nhân viên" onChange={() => {}} disabled placeholder="Vị trí công tác" />
+                <Field label="Cấp bậc (VIP)" icon={ShieldCheck} value="VIP 0" onChange={() => {}} disabled placeholder="Cấp bậc" />
               </div>
 
               <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">

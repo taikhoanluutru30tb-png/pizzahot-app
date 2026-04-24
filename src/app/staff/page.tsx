@@ -1,50 +1,24 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import type { FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { onAuthStateChanged } from "firebase/auth";
+import { doc, updateDoc } from "firebase/firestore";
+import { CheckCircle, Clock, LogIn, LogOut, ShieldCheck, Sun, TimerReset } from "lucide-react";
+
+import { auth, db } from "@/app/lib/firebase";
 import {
-  addDoc,
-  collection,
-  doc,
-  onSnapshot,
-  orderBy,
-  query,
-  updateDoc,
-} from "firebase/firestore";
-import {
-  CheckCircle,
-  LogIn,
-  LogOut,
-  ShieldCheck,
-  Sun,
-  Clock,
-  MapPin,
-  TimerReset,
-} from "lucide-react";
+  createCheckInRecord,
+  formatDateKey,
+  formatTime,
+  getUserProfile,
+  loadTimekeepingSettings,
+  subscribeTimekeepingRecords,
+  type TimekeepingRecord,
+  type TimekeepingSettings,
+  type UserProfile,
+} from "@/app/lib/timekeeping-workflow";
 
-import { db } from "@/app/lib/firebase";
-
-type TimekeepingRecord = {
-  id: string;
-  uid: string;
-  ngay: string;
-  gio_bat_dau?: string;
-  gio_ket_thuc?: string;
-};
-
-const STAFF_UID = "staff-demo-uid";
-
-function pad(value: number) {
-  return String(value).padStart(2, "0");
-}
-
-function formatDateKey(date: Date) {
-  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`;
-}
-
-function formatTime(date: Date) {
-  return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
-}
+const DEFAULT_UID = "staff-demo-uid";
 
 function formatDisplayDate(date: Date) {
   return new Intl.DateTimeFormat("vi-VN", {
@@ -55,13 +29,12 @@ function formatDisplayDate(date: Date) {
   }).format(date);
 }
 
-function isSameDayRecord(record: TimekeepingRecord, uid: string, ngay: string) {
-  return record.uid === uid && record.ngay === ngay;
-}
-
 export default function StaffAttendancePage() {
   const [now, setNow] = useState(() => new Date());
   const [records, setRecords] = useState<TimekeepingRecord[]>([]);
+  const [settings, setSettings] = useState<TimekeepingSettings | null>(null);
+  const [currentUid, setCurrentUid] = useState(DEFAULT_UID);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -71,21 +44,36 @@ export default function StaffAttendancePage() {
   }, []);
 
   useEffect(() => {
-    const q = query(collection(db, "timekeeping"), orderBy("ngay", "desc"));
-    return onSnapshot(
-      q,
-      (snapshot) => {
-        const items = snapshot.docs.map((document) => ({ id: document.id, ...document.data() } as TimekeepingRecord));
-        setRecords(items.filter((record) => record.uid === STAFF_UID));
-      },
-      (snapshotError) => setError(snapshotError.message || "Không thể tải lịch sử chấm công."),
-    );
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      const uid = user?.uid ?? DEFAULT_UID;
+      setCurrentUid(uid);
+      setProfile(user ? (await getUserProfile(user.uid)) ?? null : null);
+    });
+    return () => unsubscribe();
   }, []);
 
-  const today = useMemo(() => formatDateKey(now), [now]);
+  useEffect(() => {
+    const unsubscribe = subscribeTimekeepingRecords((items) => {
+      setRecords(items.filter((record) => record.uid === currentUid));
+    });
+    return () => unsubscribe();
+  }, [currentUid]);
+
+  useEffect(() => {
+    loadTimekeepingSettings()
+      .then(setSettings)
+      .catch(() => setSettings({ shifts: [], lateToleranceMinutes: 0, fixedPenalty: 20000 }));
+  }, []);
+
+  const todayKey = useMemo(() => formatDateKey(now), [now]);
   const todayLabel = useMemo(() => formatDisplayDate(now), [now]);
   const liveClock = useMemo(() => formatTime(now), [now]);
-  const todayRecord = useMemo(() => records.find((record) => isSameDayRecord(record, STAFF_UID, today)), [records, today]);
+
+  const todayRecord = useMemo(
+    () => records.find((record) => record.ngay === todayKey),
+    [records, todayKey],
+  );
+
   const hasCheckedInToday = Boolean(todayRecord?.gio_bat_dau);
   const hasCheckedOutToday = Boolean(todayRecord?.gio_ket_thuc);
 
@@ -99,13 +87,20 @@ export default function StaffAttendancePage() {
       return;
     }
 
+    if (!settings) {
+      setError("Đang tải cấu hình chấm công, vui lòng thử lại.");
+      return;
+    }
+
     try {
-      await addDoc(collection(db, "timekeeping"), {
-        uid: STAFF_UID,
-        ngay: today,
-        gio_bat_dau: liveClock,
+      const result = await createCheckInRecord({
+        uid: currentUid,
+        checkInAt: now,
+        settings,
+        profile: profile ?? undefined,
       });
-      setMessage("Vào ca thành công.");
+
+      setMessage(result.isLate ? `Vào ca thành công, ghi nhận trễ ${result.lateMinutes} phút.` : "Vào ca thành công.");
     } catch (checkInError) {
       setError(checkInError instanceof Error ? checkInError.message : "Không thể vào ca.");
     }
@@ -136,9 +131,7 @@ export default function StaffAttendancePage() {
     }
   }
 
-  const history = useMemo(() => {
-    return [...records].sort((a, b) => b.ngay.localeCompare(a.ngay));
-  }, [records]);
+  const history = useMemo(() => [...records].sort((a, b) => b.ngay.localeCompare(a.ngay)), [records]);
 
   return (
     <div className="space-y-6 pb-6">
@@ -165,9 +158,9 @@ export default function StaffAttendancePage() {
       <section className="rounded-[28px] border border-[#efe2df] bg-white p-4 shadow-[0_12px_40px_rgba(17,24,39,0.06)] sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#b08d85]">Theo dõi ca làm</p>
-            <h2 className="mt-2 text-[1.7rem] font-black tracking-tight text-[#231714] sm:text-[2rem]">Nhật ký trong ngày</h2>
-            <p className="mt-2 text-sm leading-6 text-[#9f827c]">Ghi nhận thời gian bắt đầu và kết thúc ca làm trong ngày hôm nay.</p>
+            <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#b08d85]">Chấm công</p>
+            <h2 className="mt-2 text-[1.7rem] font-black tracking-tight text-[#231714] sm:text-[2rem]">Thao tác nhanh</h2>
+            <p className="mt-2 text-sm leading-6 text-[#9f827c]">Hai nút lớn, dễ chạm khi thao tác trên điện thoại.</p>
           </div>
           <span className="inline-flex items-center gap-1 rounded-full bg-[#fff1f0] px-3 py-2 text-xs font-semibold text-[#dc2626] ring-1 ring-[#fecaca]">
             <ShieldCheck className="h-3.5 w-3.5" />
@@ -180,10 +173,10 @@ export default function StaffAttendancePage() {
             type="button"
             onClick={handleCheckIn}
             disabled={hasCheckedInToday}
-            className="group flex w-full items-center justify-center gap-4 rounded-[24px] bg-[#dc2626] px-5 py-5 text-white shadow-lg shadow-[#dc2626]/20 transition hover:-translate-y-0.5 hover:bg-[#b91c1c] active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-[112px] sm:px-6"
+            className="group flex min-h-[140px] w-full items-center justify-center gap-4 rounded-[24px] bg-[#dc2626] px-5 py-5 text-white shadow-lg shadow-[#dc2626]/20 transition hover:-translate-y-0.5 hover:bg-[#b91c1c] active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60 sm:px-6"
           >
-            <span className="grid h-14 w-14 place-items-center rounded-2xl bg-white/15 ring-1 ring-white/20 transition group-hover:bg-white/20 sm:h-16 sm:w-16">
-              <LogIn className="h-7 w-7 sm:h-8 sm:w-8" />
+            <span className="grid h-16 w-16 place-items-center rounded-2xl bg-white/15 ring-1 ring-white/20 transition group-hover:bg-white/20">
+              <LogIn className="h-8 w-8" />
             </span>
             <span className="text-center">
               <span className="block text-xs font-bold uppercase tracking-[0.24em] text-white/75">Bắt đầu ca</span>
@@ -195,14 +188,14 @@ export default function StaffAttendancePage() {
             type="button"
             onClick={handleCheckOut}
             disabled={!hasCheckedInToday || hasCheckedOutToday}
-            className="group flex w-full items-center justify-center gap-4 rounded-[24px] bg-white px-5 py-5 text-[#4b3a37] shadow-[0_12px_30px_rgba(17,24,39,0.08)] ring-1 ring-[#f0e3e0] transition hover:-translate-y-0.5 hover:bg-[#fff7f6] active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-[112px] sm:px-6"
+            className="group flex min-h-[140px] w-full items-center justify-center gap-4 rounded-[24px] bg-white px-5 py-5 text-[#4b3a37] shadow-[0_12px_30px_rgba(17,24,39,0.08)] ring-1 ring-[#f0e3e0] transition hover:-translate-y-0.5 hover:bg-[#fff7f6] active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60 sm:px-6"
           >
-            <span className="grid h-14 w-14 place-items-center rounded-2xl bg-[#fff1f0] text-[#dc2626] ring-1 ring-[#fecaca] transition group-hover:bg-[#ffe4e6] sm:h-16 sm:w-16">
-              <LogOut className="h-7 w-7 sm:h-8 sm:w-8" />
+            <span className="grid h-16 w-16 place-items-center rounded-2xl bg-[#fff1f0] text-[#dc2626] ring-1 ring-[#fecaca] transition group-hover:bg-[#ffe4e6]">
+              <LogOut className="h-8 w-8" />
             </span>
             <span className="text-center">
               <span className="block text-xs font-bold uppercase tracking-[0.24em] text-[#a18a86]">Kết thúc ca</span>
-              <span className="mt-1 block text-2xl font-black sm:text-3xl">Kết ca</span>
+              <span className="mt-1 block text-2xl font-black sm:text-3xl">Tan ca</span>
             </span>
           </button>
         </div>
@@ -212,11 +205,7 @@ export default function StaffAttendancePage() {
         <div className="mb-5 flex items-center justify-between gap-4">
           <div>
             <h2 className="text-xl font-bold text-[#3f2f2c] sm:text-2xl">Lịch sử chấm công</h2>
-            <p className="mt-1 text-sm text-[#8a6d68]">Các lần vào ca và kết ca trong những ngày gần đây</p>
-          </div>
-          <div className="hidden items-center gap-2 rounded-full bg-[#fff7f5] px-3 py-2 text-xs font-medium text-[#8a6d68] sm:flex">
-            <MapPin className="h-4 w-4 text-[#dc2626]" />
-            Mã nhân sự: {STAFF_UID}
+            <p className="mt-1 text-sm text-[#8a6d68]">Các lần vào ca và tan ca trong những ngày gần đây</p>
           </div>
         </div>
 
@@ -240,6 +229,11 @@ export default function StaffAttendancePage() {
                       <Clock className="h-3.5 w-3.5" />
                       Ra: {record.gio_ket_thuc ?? "---"}
                     </span>
+                    {record.phut_tre ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-[#fff1f0] px-2.5 py-1 text-xs font-semibold text-[#dc2626] ring-1 ring-[#fecaca]">
+                        Trễ: {record.phut_tre} phút
+                      </span>
+                    ) : null}
                   </div>
                 </div>
 
@@ -254,10 +248,10 @@ export default function StaffAttendancePage() {
         <div className="rounded-[24px] border-l-4 border-l-[#dc2626] bg-white p-4 shadow-[0_10px_30px_rgba(17,24,39,0.05)] ring-1 ring-[#f4e9e7]">
           <div className="flex items-center gap-3 text-sm font-semibold uppercase tracking-[0.24em] text-[#8a6d68]">
             <Sun className="h-4 w-4 text-[#dc2626]" />
-            Ca làm hiện tại
+            Cấu hình chấm công
           </div>
-          <p className="mt-3 text-xl font-black text-[#3f2f2c]">Ca chiều chính thức</p>
-          <p className="mt-2 text-sm text-[#8a6d68]">14:00 - 22:00</p>
+          <p className="mt-3 text-xl font-black text-[#3f2f2c]">{settings?.shifts?.length ?? 0} ca làm việc</p>
+          <p className="mt-2 text-sm text-[#8a6d68]">Cho phép trễ: {settings?.lateToleranceMinutes ?? 0} phút</p>
         </div>
 
         <div className="rounded-[24px] border-l-4 border-l-[#f59e0b] bg-white p-4 shadow-[0_10px_30px_rgba(17,24,39,0.05)] ring-1 ring-[#f4e9e7]">
@@ -266,7 +260,7 @@ export default function StaffAttendancePage() {
             Trạng thái
           </div>
           <p className="mt-3 text-xl font-black text-[#3f2f2c]">Sẵn sàng làm việc</p>
-          <p className="mt-2 text-sm text-[#8a6d68]">Nút lớn, dễ bấm trên mobile</p>
+          <p className="mt-2 text-sm text-[#8a6d68]">Phạt tự động được ghi nhận khi vào ca trễ.</p>
         </div>
       </section>
     </div>

@@ -130,8 +130,8 @@ export default function StaffOrdersPage() {
     const ordersQuery = query(collection(db, "orders"), orderBy("thoi_gian_tao", "desc"));
     const unsubscribe = onSnapshot(
       ordersQuery,
-      (snapshot: QueryDocumentSnapshot<DocumentData>[] | any) => {
-        setOrders(snapshot.docs.map((document: QueryDocumentSnapshot<DocumentData>) => ({ id: document.id, ...(document.data() as Omit<Order, "id">) })));
+      (snapshot: { docs: QueryDocumentSnapshot<DocumentData>[] }) => {
+        setOrders(snapshot.docs.map((document) => ({ id: document.id, ...(document.data() as Omit<Order, "id">) })));
       },
       (snapshotError) => {
         console.error("Failed to subscribe to orders:", snapshotError);
@@ -230,7 +230,7 @@ export default function StaffOrdersPage() {
               </div>
               <h1 className="text-[1.8rem] font-black tracking-tight text-[#241615] sm:text-[2.2rem] lg:text-[2.5rem]">Quản lý đơn hàng</h1>
               <p className="max-w-3xl text-sm leading-6 text-[#9a7d77] sm:text-base">
-                Staff có quyền điều phối đơn tương đương Admin, bao gồm cập nhật trạng thái và gán shipper khi chuyển sang "Đang giao".
+                Staff có quyền điều phối đơn tương đương Admin, bao gồm cập nhật trạng thái và gán shipper khi chuyển sang &quot;Đang giao&quot;.
               </p>
             </div>
           </div>

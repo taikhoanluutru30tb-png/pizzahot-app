@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import {
   ArrowLeft,
-  Clock,
   FileText,
   Minus,
   Plus,

@@ -3,13 +3,13 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
 import { Eye, EyeOff, Lock, Shield, Truck, User, Users } from "lucide-react";
-import { auth, db } from "./lib/firebase";
+import { auth } from "./lib/firebase";
+import { getRoleHomePath, loadCurrentUserRole, type AppRole } from "./lib/role-guard";
 
 const IT_SUPPORT_PHONE = "0348726823";
 
-type Role = "admin" | "staff" | "ctv" | "shipper" | "tech_support";
+type Role = AppRole;
 
 const ROLE_CARDS: Array<{
   id: Role;
@@ -37,30 +37,6 @@ const ROLE_CARDS: Array<{
     icon: <Truck className="h-5 w-5" />,
   },
 ];
-
-const ROLE_PATHS: Record<Role, string> = {
-  admin: "/admin",
-  staff: "/staff",
-  ctv: "/ctv",
-  shipper: "/shipper",
-  tech_support: "/admin",
-};
-
-const ROLE_ACCESS: Record<Exclude<Role, "tech_support">, Role[]> = {
-  admin: ["admin", "staff", "ctv", "shipper"],
-  staff: ["staff"],
-  ctv: ["ctv"],
-  shipper: ["shipper"],
-};
-
-function normalizeRole(value: unknown): Role | null {
-  if (value === "Admin") return "admin";
-  if (value === "Staff") return "staff";
-  if (value === "CTV") return "ctv";
-  if (value === "Shipper") return "shipper";
-  if (value === "Tech Support") return "tech_support";
-  return value === "admin" || value === "staff" || value === "ctv" || value === "shipper" || value === "tech_support" ? value : null;
-}
 
 export default function Page() {
   const router = useRouter();
@@ -94,40 +70,23 @@ export default function Page() {
 
     try {
       const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
-      const uid = credential.user.uid;
+      const { snapshot, data, role } = await loadCurrentUserRole(credential.user.uid);
 
-      const userRef = doc(db, "users", uid);
-      const userSnap = await getDoc(userRef);
-      const userData = userSnap.data();
-      const roleValue = normalizeRole(userData?.role);
-
-      if (roleValue === "tech_support") {
-        router.push("/admin");
-        return;
-      }
-
-      const isSupportAccount = userData?.is_support === true;
-
-      if (!userSnap.exists() && !isSupportAccount) {
+      if (!snapshot.exists()) {
         throw new Error("Tài khoản không được cấp quyền sử dụng hệ thống.");
       }
 
-      const accountRole = roleValue ?? (isSupportAccount ? "admin" : null);
+      if (data?.blocked === true) {
+        throw new Error("Tài khoản đã bị khóa.");
+      }
 
+      const accountRole = role ?? (data?.is_support === true ? "admin" : null);
       if (!accountRole) {
         throw new Error("Không xác định được vai trò người dùng.");
       }
 
-      if (userData?.blocked === true) {
-        throw new Error("Tài khoản đã bị khóa.");
-      }
-
-      const allowedRoles = ROLE_ACCESS[accountRole] ?? [accountRole];
-      if (!allowedRoles.includes(activeRole)) {
-        throw new Error("Tài khoản này không có quyền đăng nhập với vai trò đã chọn.");
-      }
-
-      router.push(ROLE_PATHS[activeRole]);
+      const targetPath = getRoleHomePath(accountRole);
+      router.replace(targetPath);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Đăng nhập thất bại. Vui lòng kiểm tra lại email/mật khẩu.";
       setError(
@@ -135,7 +94,7 @@ export default function Page() {
         message.includes("auth/wrong-password") ||
         message.includes("auth/user-not-found")
           ? "Sai tài khoản hoặc mật khẩu. Vui lòng thử lại."
-          : message
+          : message,
       );
     } finally {
       setLoading(false);

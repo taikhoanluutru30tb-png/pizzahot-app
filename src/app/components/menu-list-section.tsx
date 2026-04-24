@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { ArrowDownWideNarrow, Filter, Search, Plus } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -120,7 +121,7 @@ export function MenuListSection({
               <article key={item.id} className="rounded-[24px] border border-[#f0e3df] bg-[#fffdfc] p-4 shadow-[0_8px_24px_rgba(97,39,25,0.04)]">
                 <div className="flex gap-4">
                   <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-[#f8f2f1] ring-1 ring-[#edded9]">
-                    {item.imageUrl ? <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-xl font-black text-[#c62828]">{item.name.slice(0, 1).toUpperCase()}</div>}
+                    {item.imageUrl ? <Image src={item.imageUrl} alt={item.name} fill className="object-cover" sizes="80px" /> : <div className="flex h-full w-full items-center justify-center text-xl font-black text-[#c62828]">{item.name.slice(0, 1).toUpperCase()}</div>}
                   </div>
                   <div className="min-w-0 flex-1">
                     <h3 className="truncate text-base font-extrabold text-[#261815]">{item.name}</h3>

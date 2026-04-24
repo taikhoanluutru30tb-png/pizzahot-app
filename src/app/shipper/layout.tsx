@@ -4,20 +4,19 @@ import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { onAuthStateChanged, signOut, type User } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { onAuthStateChanged, signOut, type User as AuthUser } from "firebase/auth";
 import {
   Bell,
-  CheckCircle2,
+  CheckCircle,
   Home,
-  LayoutDashboard,
   LogOut,
   Menu,
-  MessageSquareText,
+  MessageCircle,
   Package,
+  User as UserIcon,
   UserRound,
 } from "lucide-react";
-import { auth, db } from "../lib/firebase";
+import { auth, getAccessDeniedMessage, getDisplayName, loadCurrentUserRole, canAccessWorkspace, getWorkspaceFromPath, ROLE_LABELS } from "../lib/role-guard";
 
 type NavItem = {
   label: string;
@@ -26,30 +25,11 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { label: "Đơn đang giao", href: "/shipper", icon: LayoutDashboard },
-  { label: "Đơn đã giao", href: "/shipper/report", icon: CheckCircle2 },
-  { label: "Tin nhắn", href: "/shipper/message", icon: MessageSquareText },
-  { label: "Hồ sơ", href: "/shipper/profile", icon: UserRound },
+  { label: "Đang giao hàng", href: "/shipper", icon: Home },
+  { label: "Hoàn tất", href: "/shipper/report", icon: CheckCircle },
+  { label: "Tin nhắn", href: "/shipper/message", icon: MessageCircle },
+  { label: "Hồ sơ cá nhân", href: "/shipper/profile", icon: UserIcon },
 ];
-
-const ROLE_LABELS: Record<string, string> = {
-  shipper: "Shipper",
-  tech_support: "Hỗ trợ kỹ thuật",
-};
-
-function getDisplayName(user: User, userData: Record<string, unknown> | undefined) {
-  const candidates = [
-    userData?.fullName,
-    userData?.displayName,
-    userData?.name,
-    user.displayName,
-    user.email,
-  ];
-
-  const found = candidates.find((value): value is string => typeof value === "string" && value.trim().length > 0);
-  return found ?? "Tài khoản đăng nhập";
-}
-
 
 export default function ShipperLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -59,7 +39,7 @@ export default function ShipperLayout({ children }: { children: ReactNode }) {
   const [roleLabel, setRoleLabel] = useState(ROLE_LABELS.shipper);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user: AuthUser | null) => {
       if (!user) {
         setLoading(false);
         router.replace("/");
@@ -67,19 +47,18 @@ export default function ShipperLayout({ children }: { children: ReactNode }) {
       }
 
       try {
-        const userSnap = await getDoc(doc(db, "users", user.uid));
-        const userData = userSnap.data() as Record<string, unknown> | undefined;
-        const role = userData?.role;
+        const { snapshot, data, role } = await loadCurrentUserRole(user.uid);
+        const workspace = getWorkspaceFromPath(pathname);
 
-        if (!userSnap.exists() || (role !== "shipper" && role !== "tech_support")) {
+        if (!snapshot.exists() || !canAccessWorkspace(role, workspace)) {
           await signOut(auth);
           setLoading(false);
-          router.replace("/");
+          router.replace("/?message=" + encodeURIComponent(getAccessDeniedMessage()));
           return;
         }
 
-        setDisplayName(getDisplayName(user, userData));
-        setRoleLabel(ROLE_LABELS[String(role)] ?? ROLE_LABELS.shipper);
+        setDisplayName(getDisplayName(user, data));
+        setRoleLabel(role ? ROLE_LABELS[role] : ROLE_LABELS.shipper);
         setLoading(false);
       } catch {
         await signOut(auth);
@@ -89,7 +68,7 @@ export default function ShipperLayout({ children }: { children: ReactNode }) {
     });
 
     return () => unsubscribe();
-  }, [router]);
+  }, [pathname, router]);
 
   const activeHref = useMemo(() => {
     return NAV_ITEMS.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))?.href;
@@ -138,13 +117,13 @@ export default function ShipperLayout({ children }: { children: ReactNode }) {
         <div className="rounded-[24px] bg-[#121212] p-4 shadow-inner shadow-black/30 ring-1 ring-white/5">
           <div className="flex items-center gap-3">
             <div className="grid h-14 w-14 place-items-center rounded-full bg-[#dc2626] text-white">
-              <UserRound className="h-7 w-7" />
+              <UserIcon className="h-7 w-7" />
             </div>
             <div className="min-w-0">
               <div className="truncate text-lg font-bold text-[#f0cec9]" title={displayName}>
-                {displayName}
+                Xin chào, {displayName}
               </div>
-              <div className="text-sm text-[#9f817d]">{roleLabel}</div>
+              <div className="text-sm text-[#9f817d]">Vị trí: {roleLabel}</div>
             </div>
           </div>
 

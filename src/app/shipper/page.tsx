@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
-import { collection, doc, onSnapshot, orderBy, query, updateDoc } from "firebase/firestore";
+import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import {
   Bell,
   CheckCircle2,
@@ -17,29 +17,7 @@ import {
 } from "lucide-react";
 
 import { auth, db } from "@/app/lib/firebase";
-
-type OrderDoc = {
-  id: string;
-  khach_hang?: {
-    ten?: string;
-    sdt?: string;
-    dia_chi?: string;
-    ghi_chu?: string;
-  };
-  danh_sach_mon?: Array<{
-    name?: string;
-    ten_mon?: string;
-    quantity?: number;
-    so_luong?: number;
-  }>;
-  tong_tien?: number;
-  trang_thai?: string;
-  nguoi_giao?: string;
-  thoi_gian_tao?: {
-    toDate?: () => Date;
-    seconds?: number;
-  };
-};
+import { updateOrder, type OrderDoc as ShipperOrderDoc } from "@/app/lib/order-workflow";
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("vi-VN", {
@@ -49,18 +27,22 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
-function formatDate(value?: OrderDoc["thoi_gian_tao"]) {
+function formatDate(value?: ShipperOrderDoc["thoi_gian_tao"]) {
   if (!value) return "Chưa có thời gian";
-  if (typeof value.toDate === "function") return value.toDate().toLocaleString("vi-VN");
-  if (typeof value.seconds === "number") return new Date(value.seconds * 1000).toLocaleString("vi-VN");
+  if (typeof value === "object" && value !== null && "toDate" in value && typeof value.toDate === "function") {
+    return value.toDate().toLocaleString("vi-VN");
+  }
+  if (typeof value === "object" && value !== null && "seconds" in value && typeof value.seconds === "number") {
+    return new Date(value.seconds * 1000).toLocaleString("vi-VN");
+  }
   return "Chưa có thời gian";
 }
 
-function getItemName(item: NonNullable<OrderDoc["danh_sach_mon"]>[number]) {
+function getItemName(item: NonNullable<ShipperOrderDoc["danh_sach_mon"]>[number]) {
   return item.ten_mon || item.name || "Món ăn";
 }
 
-function getItemQuantity(item: NonNullable<OrderDoc["danh_sach_mon"]>[number]) {
+function getItemQuantity(item: NonNullable<ShipperOrderDoc["danh_sach_mon"]>[number]) {
   return item.so_luong ?? item.quantity ?? 1;
 }
 
@@ -69,7 +51,7 @@ function OrderCard({
   onComplete,
   loading,
 }: {
-  order: OrderDoc;
+  order: ShipperOrderDoc;
   onComplete: (orderId: string) => Promise<void>;
   loading: boolean;
 }) {
@@ -181,7 +163,7 @@ function OrderCard({
 }
 
 export default function ShipperTransitPage() {
-  const [orders, setOrders] = useState<OrderDoc[]>([]);
+  const [orders, setOrders] = useState<ShipperOrderDoc[]>([]);
   const [currentUid, setCurrentUid] = useState<string | null>(null);
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -196,7 +178,6 @@ export default function ShipperTransitPage() {
 
   useEffect(() => {
     if (!currentUid) {
-      setOrders([]);
       return;
     }
 
@@ -204,7 +185,7 @@ export default function ShipperTransitPage() {
     return onSnapshot(
       q,
       (snapshot) => {
-        const items = snapshot.docs.map((document) => ({ id: document.id, ...(document.data() as Omit<OrderDoc, "id">) }));
+        const items = snapshot.docs.map((document) => ({ id: document.id, ...(document.data() as Omit<ShipperOrderDoc, "id">) }));
         setOrders(items.filter((order) => order.trang_thai === "Đang giao hàng" && order.nguoi_giao === currentUid));
       },
       (snapshotError) => {
@@ -227,7 +208,7 @@ export default function ShipperTransitPage() {
     setUpdatingOrderId(orderId);
 
     try {
-      await updateDoc(doc(db, "orders", orderId), { trang_thai: "Hoàn tất" });
+      await updateOrder(orderId, { trang_thai: "Hoàn tất" });
       setToast("Đơn hàng đã được giao xong.");
     } catch (completeError) {
       console.error("Failed to complete delivery:", completeError);

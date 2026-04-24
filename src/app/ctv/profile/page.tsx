@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useState } from "react";
-import { Camera, Check, Edit, Mail, Phone, User2 } from "lucide-react";
+import { Camera, Check, Coins, Edit, Mail, Phone, User, User2 } from "lucide-react";
 
 type ProfileForm = {
   fullName: string;
@@ -34,7 +34,20 @@ export default function CtvProfilePage() {
     <main className="min-h-dvh bg-[#fbf7f6] text-[#2b1d1a]">
       <div className="mx-auto flex min-h-dvh w-full max-w-3xl flex-col px-4 py-4 sm:px-5 sm:py-6 lg:px-6">
         <section className="rounded-[30px] bg-gradient-to-br from-white to-[#fff8f6] p-5 shadow-[0_14px_40px_rgba(97,39,25,0.08)] ring-1 ring-[#f0dfda] sm:p-6">
-          <div className="mb-5 flex items-start justify-between gap-4">
+          <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+            <article className="rounded-[28px] bg-gradient-to-br from-[#c62828] to-[#dc2626] p-5 text-white shadow-[0_16px_40px_rgba(198,40,40,0.22)] ring-1 ring-white/10 sm:p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-white/75">Tổng thu nhập</p>
+                  <div className="mt-3 text-[2.2rem] font-black tracking-tight sm:text-[2.8rem]">18.500.000đ</div>
+                  <p className="mt-2 text-sm text-white/80">Thu nhập + hoa hồng tạm tính trong tháng hiện tại</p>
+                </div>
+                <div className="grid h-14 w-14 place-items-center rounded-2xl bg-white/15 ring-1 ring-white/20">
+                  <Coins className="h-7 w-7" />
+                </div>
+              </div>
+            </article>
+
             <div className="space-y-2">
               <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#b58f88]">
                 Hồ sơ & cài đặt tài khoản
@@ -42,7 +55,9 @@ export default function CtvProfilePage() {
               <h1 className="text-2xl font-black tracking-tight text-[#3b2420] sm:text-3xl">Hồ sơ cá nhân</h1>
               <p className="max-w-2xl text-sm leading-6 text-[#94736d] sm:text-base">Cập nhật thông tin cá nhân và tài khoản ngân hàng nhận lương/hoa hồng.</p>
             </div>
+          </div>
 
+          <div className="mt-4 flex justify-end">
             <button
               type="button"
               onClick={() => setIsEditing((current) => !current)}
@@ -89,10 +104,11 @@ export default function CtvProfilePage() {
 
             <div className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Họ và tên" icon={User2} value={form.fullName} onChange={(value) => handleChange("fullName", value)} disabled={!isEditing} placeholder="Tên nhân viên" />
+                <Field label="Họ và tên" icon={User} value={form.fullName} onChange={(value) => handleChange("fullName", value)} disabled={!isEditing} placeholder="Tên nhân viên" />
                 <Field label="Số điện thoại" icon={Phone} value={form.phone} onChange={(value) => handleChange("phone", value)} disabled={!isEditing} placeholder="Số điện thoại" />
-                <Field label="Email" icon={Mail} value={form.email} onChange={(value) => handleChange("email", value)} disabled={!isEditing} placeholder="tennhanvien@pizzahot.com" />
-                <Field label="Số tài khoản ngân hàng" icon={Check} value={form.bankAccount} onChange={(value) => handleChange("bankAccount", value)} disabled={!isEditing} placeholder="Số tài khoản để nhận lương/hoa hồng" />
+                <Field label="Email" icon={Mail} value={form.email} onChange={(value) => handleChange("email", value)} disabled placeholder="tennhanvien@pizzahot.com" />
+                <Field label="Vị trí công tác" icon={User2} value="Đối tác bán hàng" onChange={() => {}} disabled placeholder="Vị trí công tác" />
+                <Field label="Cấp bậc (VIP)" icon={Check} value="VIP 1" onChange={() => {}} disabled placeholder="Cấp bậc" />
               </div>
 
               <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">

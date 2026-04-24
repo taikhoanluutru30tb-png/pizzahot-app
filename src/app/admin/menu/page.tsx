@@ -10,10 +10,9 @@ import {
   serverTimestamp,
   updateDoc,
 } from "firebase/firestore";
-import { Edit3, Plus, Trash2, UtensilsCrossed, X } from "lucide-react";
+import { Edit3, Plus, Trash2, X } from "lucide-react";
 
 import { db } from "@/app/lib/firebase";
-import { MenuListSection } from "@/app/components/menu-list-section";
 import { useMenuItems, type MenuItem } from "@/app/lib/use-menu-items";
 
 type MenuFormState = {
@@ -42,28 +41,8 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
-function ActionButton({ icon: Icon, label, tone = "neutral", onClick }: { icon: React.ComponentType<{ className?: string }>; label: string; tone?: "neutral" | "danger"; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border transition ${
-        tone === "danger"
-          ? "border-[#f2d1d1] bg-[#fff7f7] text-[#c62828] hover:bg-[#ffecec]"
-          : "border-[#e8d8d3] bg-white text-[#7d645f] hover:bg-[#faf6f5]"
-      }`}
-    >
-      <Icon className="h-4 w-4" />
-    </button>
-  );
-}
-
 export default function AdminMenuPage() {
-  const { menuItems: items, categories, loading, error: menuError } = useMenuItems();
-  const [search, setSearch] = useState("");
-  const [activeCategory, setActiveCategory] = useState("Tất cả");
-  const [sort, setSort] = useState("recommended");
+  const { menuItems: items, error: menuError } = useMenuItems();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [form, setForm] = useState<MenuFormState>(emptyForm);

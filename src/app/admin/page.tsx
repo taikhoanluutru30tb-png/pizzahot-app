@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Banknote, Clock, LineChart, Package, ShoppingCart, Users } from "lucide-react";
+import { Banknote, ChartBar, Package, ShoppingBag, TrendingUp, Users } from "lucide-react";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "@/app/lib/firebase";
 
@@ -38,11 +38,11 @@ type RecentOrder = {
 };
 
 const statusStyles: Record<string, { label: string; className: string }> = {
-  "Hoàn thành": { label: "Hoàn thành", className: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" },
+  "Hoàn tất": { label: "Hoàn tất", className: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" },
   "Đã hủy": { label: "Đã hủy", className: "bg-rose-50 text-rose-700 ring-1 ring-rose-200" },
-  "Đang xử lý": { label: "Đang xử lý", className: "bg-amber-50 text-amber-700 ring-1 ring-amber-200" },
-  "Đang chuẩn bị": { label: "Đang chuẩn bị", className: "bg-blue-50 text-blue-700 ring-1 ring-blue-200" },
-  "Đang giao": { label: "Đang giao", className: "bg-violet-50 text-violet-700 ring-1 ring-violet-200" },
+  "Chờ xử lý": { label: "Chờ xử lý", className: "bg-amber-50 text-amber-700 ring-1 ring-amber-200" },
+  "Đang chế biến": { label: "Đang chế biến", className: "bg-blue-50 text-blue-700 ring-1 ring-blue-200" },
+  "Đang giao hàng": { label: "Đang giao hàng", className: "bg-violet-50 text-violet-700 ring-1 ring-violet-200" },
 };
 
 function formatVnd(amount: number) {
@@ -82,7 +82,12 @@ function getCustomerName(order: FirestoreOrder) {
 }
 
 function getOrderStatus(order: FirestoreOrder) {
-  return order.trang_thai || order.status || "Đang xử lý";
+  const status = order.trang_thai || order.status || "Chờ xử lý";
+  if (status === "Đang xử lý") return "Chờ xử lý";
+  if (status === "Đang chuẩn bị") return "Đang chế biến";
+  if (status === "Đang giao") return "Đang giao hàng";
+  if (status === "Hoàn thành") return "Hoàn tất";
+  return status;
 }
 
 function RevenueSummaryCard({ loading, metrics }: { loading: boolean; metrics: MetricCard[] }) {
@@ -120,7 +125,7 @@ function RevenueChart({ loading, orders }: { loading: boolean; orders: RecentOrd
     const totals = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"].map((label) => ({ label, value: 0 }));
 
     orders.forEach((order) => {
-      if (order.status !== "Hoàn thành" || !order.createdAtMs) return;
+      if (order.status !== "Hoàn tất" || !order.createdAtMs) return;
       const day = new Date(order.createdAtMs).getDay();
       totals[day].value += order.total;
     });
@@ -138,7 +143,7 @@ function RevenueChart({ loading, orders }: { loading: boolean; orders: RecentOrd
           <p className="mt-1 text-sm text-[#9a7d77]">Tổng doanh thu theo ngày trong dữ liệu hiện có</p>
         </div>
         <div className="flex items-center gap-2 rounded-full bg-[#fff4f3] px-3 py-2 text-sm font-semibold text-[#c62828]">
-          <LineChart className="h-4 w-4" />
+          <TrendingUp className="h-4 w-4" />
           Realtime
         </div>
       </div>
@@ -214,7 +219,7 @@ export default function AdminDashboardPage() {
         const total = Number(data.tong_tien || 0);
         const createdAtMs = getTimestampMs(data.thoi_gian_tao);
 
-        if (status === "Hoàn thành") {
+        if (status === "Hoàn tất") {
           revenue += total;
           completed += 1;
         } else if (status !== "Đã hủy") {
@@ -268,7 +273,7 @@ export default function AdminDashboardPage() {
       {
         title: "Tổng doanh thu",
         value: formatVnd(totalRevenue),
-        subtitle: `${completedOrders} đơn hoàn thành`,
+        subtitle: `${completedOrders} đơn hoàn tất`,
         icon: Banknote,
         bgClass: "bg-[#c62828] text-white",
         iconClass: "bg-white/15 text-white",
@@ -278,7 +283,7 @@ export default function AdminDashboardPage() {
         title: "Tổng đơn hàng",
         value: String(completedOrders + processingOrders),
         subtitle: `${processingOrders} đơn đang xử lý`,
-        icon: ShoppingCart,
+        icon: ShoppingBag,
         bgClass: "bg-white text-[#4b3a37]",
         iconClass: "bg-[#f7e8e7] text-[#c62828]",
         valueClass: "text-[#241615]",
@@ -311,15 +316,15 @@ export default function AdminDashboardPage() {
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
             <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#b4534c]">Chào buổi sáng</p>
-            <h1 className="mt-3 text-[2.2rem] font-black tracking-tight text-[#2b1814] lg:text-[4rem]">Trang chủ</h1>
+            <h1 className="mt-3 text-[2.2rem] font-black tracking-tight text-[#2b1814] lg:text-[4rem]">Tổng quan</h1>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-[#8f6f68] lg:text-[1rem]">
               Báo cáo tổng quan
             </p>
           </div>
 
           <div className="inline-flex items-center justify-center gap-2 self-start rounded-full bg-gradient-to-r from-[#b91c1c] to-[#dc2626] px-6 py-3 text-sm font-bold text-white shadow-[0_18px_30px_rgba(185,28,28,0.22)]">
-            <Clock className="h-4 w-4" />
-            Realtime Dashboard
+            <ChartBar className="h-4 w-4" />
+            Đang tải thống kê...
           </div>
         </div>
       </section>

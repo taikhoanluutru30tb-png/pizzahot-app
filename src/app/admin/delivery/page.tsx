@@ -108,12 +108,6 @@ export default function AdminDeliveryPage() {
     [selectedShipperId, visibleShippers]
   );
 
-  useEffect(() => {
-    if (!selectedOrderId && waitingOrders[0]) {
-      setSelectedOrderId(waitingOrders[0].id);
-    }
-  }, [selectedOrderId, waitingOrders]);
-
   async function handleAssign() {
     setError(null);
     setMessage(null);

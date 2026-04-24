@@ -5,22 +5,21 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { auth, getAccessDeniedMessage, getDisplayName, loadCurrentUserRole, canAccessWorkspace, getWorkspaceFromPath, ROLE_LABELS } from "../lib/role-guard";
 import {
-  BarChart3,
-  ChevronRight,
+  ArrowRight,
+  Briefcase,
+  ChartBar,
   ClipboardList,
   Home,
   LogOut,
-  MessageSquareText,
+  MessageCircle,
   PackagePlus,
-  Settings2,
+  Settings,
   ShoppingBag,
-  Store,
   Users,
-  UtensilsCrossed,
+  Utensils,
 } from "lucide-react";
-import { auth, db } from "../lib/firebase";
 
 type NavItem = {
   label: string;
@@ -29,39 +28,17 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { label: "Trang chủ", href: "/admin", icon: Home },
-  { label: "Báo cáo", href: "/admin/report", icon: BarChart3 },
+  { label: "Tổng quan", href: "/admin", icon: Home },
+  { label: "Báo cáo", href: "/admin/report", icon: ChartBar },
   { label: "Tạo đơn hàng", href: "/admin/create-order", icon: PackagePlus },
-  { label: "Quản lý thực đơn", href: "/admin/menu", icon: UtensilsCrossed },
+  { label: "Thực đơn", href: "/admin/menu", icon: Utensils },
   { label: "Quản lý đơn hàng", href: "/admin/orders", icon: ClipboardList },
-  { label: "Xếp shipper", href: "/admin/delivery", icon: ShoppingBag },
-  { label: "Quản lý nhân sự", href: "/admin/hr", icon: Users },
-  { label: "Chấm công", href: "/admin/timekeeping", icon: Store },
-  { label: "Tin nhắn", href: "/admin/message", icon: MessageSquareText },
-  { label: "Hồ sơ cá nhân", href: "/admin/profile", icon: Settings2 },
+  { label: "Giao hàng", href: "/admin/delivery", icon: ShoppingBag },
+  { label: "Nhân sự", href: "/admin/hr", icon: Users },
+  { label: "Ca làm việc / Chấm công", href: "/admin/timekeeping", icon: Briefcase },
+  { label: "Tin nhắn", href: "/admin/message", icon: MessageCircle },
+  { label: "Hồ sơ cá nhân", href: "/admin/profile", icon: Settings },
 ];
-
-const ROLE_LABELS: Record<string, string> = {
-  admin: "Quản trị viên",
-  staff: "Nhân viên",
-  ctv: "CTV",
-  shipper: "Shipper",
-  tech_support: "Hỗ trợ kỹ thuật",
-};
-
-function getDisplayName(user: User, userData: Record<string, unknown> | undefined) {
-  const candidates = [
-    userData?.fullName,
-    userData?.displayName,
-    userData?.name,
-    user.displayName,
-    user.email,
-  ];
-
-  const found = candidates.find((value): value is string => typeof value === "string" && value.trim().length > 0);
-  return found ?? "Tài khoản đăng nhập";
-}
-
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -80,19 +57,19 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       }
 
       try {
-        const userSnap = await getDoc(doc(db, "users", user.uid));
-        const userData = userSnap.data() as Record<string, unknown> | undefined;
-        const role = userData?.role;
+        const { snapshot, data, role } = await loadCurrentUserRole(user.uid);
+        const workspace = getWorkspaceFromPath(pathname);
+        const roleOk = canAccessWorkspace(role, workspace);
 
-        if (!userSnap.exists() || (role !== "admin" && role !== "tech_support")) {
+        if (!snapshot.exists() || !roleOk) {
           await signOut(auth);
           setLoading(false);
-          router.replace("/");
+          router.replace("/?message=" + encodeURIComponent(getAccessDeniedMessage()));
           return;
         }
 
-        setDisplayName(getDisplayName(user, userData));
-        setRoleLabel(ROLE_LABELS[String(role)] ?? ROLE_LABELS.admin);
+        setDisplayName(getDisplayName(user, data));
+        setRoleLabel(ROLE_LABELS[role ?? "admin"]);
         setIsTechSupport(role === "tech_support");
         setLoading(false);
       } catch {
@@ -103,7 +80,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     });
 
     return () => unsubscribe();
-  }, [router]);
+  }, [pathname, router]);
 
   if (loading) {
     return (
@@ -139,7 +116,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                   <Icon className="h-5 w-5 shrink-0" />
                   <span>{item.label}</span>
                 </span>
-                <ChevronRight className="h-4 w-4 opacity-70" />
+                <ArrowRight className="h-4 w-4 opacity-70" />
               </Link>
             );
           })}
@@ -152,9 +129,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             </div>
             <div className="min-w-0">
               <div className="truncate text-lg font-bold text-[#e8c8c5]" title={displayName}>
-                {displayName}
+                Xin chào, {displayName}
               </div>
-              <div className="text-sm text-[#8f7170]">{roleLabel}</div>
+              <div className="text-sm text-[#8f7170]">Vị trí: {roleLabel}</div>
             </div>
           </div>
           <button
@@ -189,10 +166,10 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         <div className="fixed bottom-4 left-1/2 z-40 w-[calc(100%-1.5rem)] max-w-2xl -translate-x-1/2 rounded-2xl border border-[#f0c9c7] bg-white/95 p-3 shadow-[0_12px_35px_rgba(0,0,0,0.18)] backdrop-blur">
           <div className="flex flex-wrap items-center justify-center gap-2">
             {[
-              { label: "Tới Admin", href: "/admin" },
-              { label: "Tới Staff", href: "/staff" },
+              { label: "Tới Quản lý", href: "/admin" },
+              { label: "Tới Nhân viên", href: "/staff" },
               { label: "Tới CTV", href: "/ctv" },
-              { label: "Tới Shipper", href: "/shipper" },
+              { label: "Tới Giao hàng", href: "/shipper" },
             ].map((item) => (
               <Link
                 key={item.href}

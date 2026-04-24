@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useState } from "react";
-import { Camera, Check, Edit, Mail, Phone, User2 } from "lucide-react";
+import { Camera, Edit, Mail, Phone, User, ShieldCheck } from "lucide-react";
 
 type ProfileForm = {
   fullName: string;
@@ -18,7 +18,7 @@ const initialProfile: ProfileForm = {
   bankAccount: "0123456789",
 };
 
-export default function CtvProfilePage() {
+export default function AdminProfilePage() {
   const [form, setForm] = useState<ProfileForm>(initialProfile);
   const [isEditing, setIsEditing] = useState(false);
 
@@ -78,7 +78,7 @@ export default function CtvProfilePage() {
                 <h2 className="text-xl font-extrabold tracking-tight text-[#3b2420]">
                   {form.fullName}
                 </h2>
-                <p className="text-sm font-medium text-[#9b7a73]">Quản trị viên</p>
+                <p className="text-sm font-medium text-[#9b7a73]">Vị trí: Quản lý</p>
               </div>
 
               <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#fff4f2] px-3 py-2 text-xs font-bold uppercase tracking-[0.18em] text-[#b84f46]">
@@ -89,10 +89,11 @@ export default function CtvProfilePage() {
 
             <div className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Họ và tên" icon={User2} value={form.fullName} onChange={(value) => handleChange("fullName", value)} disabled={!isEditing} placeholder="Tên nhân viên" />
+                <Field label="Họ và tên" icon={User} value={form.fullName} onChange={(value) => handleChange("fullName", value)} disabled={!isEditing} placeholder="Tên nhân viên" />
                 <Field label="Số điện thoại" icon={Phone} value={form.phone} onChange={(value) => handleChange("phone", value)} disabled={!isEditing} placeholder="Số điện thoại" />
-                <Field label="Email" icon={Mail} value={form.email} onChange={(value) => handleChange("email", value)} disabled={!isEditing} placeholder="tennhanvien@pizzahot.com" />
-                <Field label="Số tài khoản ngân hàng" icon={Check} value={form.bankAccount} onChange={(value) => handleChange("bankAccount", value)} disabled={!isEditing} placeholder="Số tài khoản để nhận lương/hoa hồng" />
+                <Field label="Email" icon={Mail} value={form.email} onChange={(value) => handleChange("email", value)} disabled placeholder="tennhanvien@pizzahot.com" />
+                <Field label="Vị trí công tác" icon={User} value="Quản lý" onChange={() => {}} disabled placeholder="Vị trí công tác" />
+                <Field label="Cấp bậc (VIP)" icon={ShieldCheck} value="VIP 1" onChange={() => {}} disabled placeholder="Cấp bậc" />
               </div>
 
               <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
@@ -127,21 +128,21 @@ type FieldProps = {
   onChange: (value: string) => void;
   disabled?: boolean;
   placeholder: string;
-  icon: typeof User2;
+  icon: typeof User;
 };
 
 function Field({ label, value, onChange, disabled, placeholder, icon: Icon }: FieldProps) {
   return (
     <label className="space-y-2">
       <span className="text-sm font-bold text-[#6a4c46]">{label}</span>
-      <div className="flex items-center gap-3 rounded-2xl bg-white px-4 py-3.5 shadow-[0_8px_22px_rgba(97,39,25,0.04)] ring-1 ring-[#eaded9] transition focus-within:ring-[#c62828]">
+      <div className={`flex items-center gap-3 rounded-2xl px-4 py-3.5 shadow-[0_8px_22px_rgba(97,39,25,0.04)] ring-1 transition focus-within:ring-[#c62828] ${disabled ? "bg-[#f5f5f5] ring-[#e0e0e0]" : "bg-white ring-[#eaded9]"}`}>
         <Icon className="h-4 w-4 shrink-0 text-[#be8e85]" />
         <input
           value={value}
           onChange={(event) => onChange(event.target.value)}
           disabled={disabled}
           placeholder={placeholder}
-          className="w-full bg-transparent text-sm font-medium text-[#2c1f1b] outline-none placeholder:text-[#b39690] disabled:cursor-not-allowed disabled:text-[#5f4741]"
+          className={`w-full bg-transparent text-sm font-medium outline-none placeholder:text-[#b39690] ${disabled ? "cursor-not-allowed text-[#7f7f7f]" : "text-[#2c1f1b]"}`}
         />
       </div>
     </label>

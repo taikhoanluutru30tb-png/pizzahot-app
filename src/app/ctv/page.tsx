@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot, orderBy, query, where } from "firebase/firestore";
-import { Coins, ShoppingBag, UserCircle, BarChart3 } from "lucide-react";
+import { ChartBar, Coins, ShoppingBag, UserCircle } from "lucide-react";
 
 import { db } from "@/app/lib/firebase";
 
@@ -40,12 +40,12 @@ export default function CtvPage() {
         const items = snapshot.docs.map((document) => ({ id: document.id, ...document.data() } as FirestoreOrder));
         setOrders(items);
       },
-      (snapshotError) => setError(snapshotError.message || "Không thể tải dữ liệu dashboard CTV."),
+      (snapshotError) => setError(snapshotError.message || "Đang tổng hợp dữ liệu hoa hồng..."),
     );
   }, []);
 
   const completedOrders = useMemo(
-    () => orders.filter((order) => order.trang_thai === "Hoàn thành"),
+    () => orders.filter((order) => order.trang_thai === "Hoàn tất"),
     [orders],
   );
 
@@ -58,28 +58,28 @@ export default function CtvPage() {
 
   const stats = [
     {
-      title: "Tổng doanh thu",
-      value: formatCurrency(totalRevenue),
-      subtitle: "Doanh thu từ đơn hoàn thành",
-      icon: BarChart3,
-      iconClassName: "text-sky-500",
+      title: "Tổng thu nhập",
+      value: formatCurrency(totalRevenue + commission),
+      subtitle: "Tổng doanh thu và hoa hồng tạm tính",
+      icon: ChartBar,
+      iconClassName: "text-[#c62828]",
       cardClassName: "bg-white",
     },
     {
-      title: "Số đơn thành công",
-      value: String(completedOrders.length),
-      subtitle: "Đơn đã hoàn tất và thanh toán",
-      icon: ShoppingBag,
-      iconClassName: "text-violet-500",
-      cardClassName: "bg-white",
-    },
-    {
-      title: "Hoa hồng tạm tính",
+      title: "Hoa hồng",
       value: formatCurrency(commission),
       subtitle: "10% trên tổng doanh thu hoàn thành",
       icon: Coins,
-      iconClassName: "text-green-600",
-      cardClassName: "bg-gradient-to-br from-[#0f9d58] to-[#22c55e] text-white",
+      iconClassName: "text-[#c62828]",
+      cardClassName: "bg-gradient-to-br from-[#c62828] to-[#dc2626] text-white",
+    },
+    {
+      title: "Đơn hoàn tất",
+      value: String(completedOrders.length),
+      subtitle: "Đơn đã hoàn tất và thanh toán",
+      icon: ShoppingBag,
+      iconClassName: "text-[#c62828]",
+      cardClassName: "bg-white",
     },
   ];
 
@@ -90,7 +90,7 @@ export default function CtvPage() {
           <p className="text-sm font-medium uppercase tracking-[0.24em] text-[#b4534c]">Tổng quan CTV</p>
           <h1 className="text-2xl font-extrabold tracking-tight text-[#3f2723] lg:text-4xl">Xin chào, CTV</h1>
           <p className="max-w-xl text-sm text-[#8d6a64] lg:text-base">
-            Tổng quan đơn hàng, doanh thu, số đơn thành công và hoa hồng tạm tính.
+            Đang tổng hợp dữ liệu hoa hồng và thu nhập từ các đơn đã hoàn tất.
           </p>
         </div>
 
@@ -108,20 +108,24 @@ export default function CtvPage() {
       {error ? <div className="rounded-2xl border border-[#f2d1d1] bg-[#fff7f7] px-4 py-3 text-sm font-medium text-[#b42318]">{error}</div> : null}
 
       <div className="grid gap-4 lg:grid-cols-3 lg:gap-6">
-        {stats.map((item) => {
+        {stats.map((item, index) => {
           const Icon = item.icon;
+          const isHighlighted = index === 1;
           const isWhiteText = item.cardClassName.includes("text-white");
 
           return (
-            <article key={item.title} className={`rounded-[28px] p-5 shadow-sm ring-1 ring-black/5 lg:p-6 ${item.cardClassName}`}>
+            <article
+              key={item.title}
+              className={`rounded-[30px] p-5 shadow-[0_16px_40px_rgba(97,39,25,0.08)] ring-1 ring-black/5 lg:p-6 ${item.cardClassName}`}
+            >
               <div className="flex items-start justify-between gap-4">
                 <div className="space-y-3">
                   <p className={`text-sm font-semibold uppercase tracking-[0.18em] ${isWhiteText ? "text-white/80" : "text-[#9c6a62]"}`}>{item.title}</p>
-                  <div className={`text-3xl font-extrabold tracking-tight lg:text-4xl ${isWhiteText ? "text-white" : "text-[#3d231f]"}`}>{item.value}</div>
+                  <div className={`text-[2.2rem] font-black tracking-tight lg:text-[3.2rem] ${isWhiteText ? "text-white" : "text-[#3d231f]"}`}>{item.value}</div>
                   <p className={`text-sm ${isWhiteText ? "text-white/80" : "text-[#8f6f68]"}`}>{item.subtitle}</p>
                 </div>
 
-                <div className={`grid h-14 w-14 shrink-0 place-items-center rounded-2xl ${isWhiteText ? "bg-white/10 ring-1 ring-white/20" : "bg-[#f8f0ee]"}`}>
+                <div className={`grid h-14 w-14 shrink-0 place-items-center rounded-2xl ${isWhiteText ? "bg-white/10 ring-1 ring-white/20" : isHighlighted ? "bg-white/20 text-white" : "bg-[#f8f0ee]"}`}>
                   <Icon className={`h-7 w-7 ${item.iconClassName}`} />
                 </div>
               </div>

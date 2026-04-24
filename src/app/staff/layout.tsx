@@ -4,53 +4,34 @@ import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { onAuthStateChanged, signOut, type User } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { onAuthStateChanged, signOut, type User as FirebaseUser } from "firebase/auth";
+import { auth, getAccessDeniedMessage, getDisplayName, loadCurrentUserRole, canAccessWorkspace, getWorkspaceFromPath, ROLE_LABELS } from "../lib/role-guard";
 import {
-  ArrowRightLeft,
-  CalendarCheck2,
-  CornerDownLeft,
+  ArrowLeftRight,
+  CalendarCheck,
+  Home,
   LogOut,
-  MessageSquareText,
+  MessageCircle,
   PackagePlus,
   PhoneCall,
+  User as UserIcon,
   UserRound,
 } from "lucide-react";
-import { auth, db } from "../lib/firebase";
 
 
 type NavItem = {
   label: string;
   href: string;
-  icon: typeof CalendarCheck2;
+  icon: typeof CalendarCheck;
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { label: "Chấm công", href: "/staff", icon: CalendarCheck2 },
+  { label: "Vào ca", href: "/staff", icon: CalendarCheck },
   { label: "Tạo đơn hàng", href: "/staff/create-order", icon: PackagePlus },
-  { label: "Xếp shipper", href: "/staff/delivery", icon: ArrowRightLeft },
-  { label: "Tin nhắn", href: "/staff/message", icon: MessageSquareText },
-  { label: "Hồ sơ", href: "/staff/profile", icon: UserRound },
+  { label: "Giao hàng", href: "/staff/delivery", icon: ArrowLeftRight },
+  { label: "Tin nhắn", href: "/staff/message", icon: MessageCircle },
+  { label: "Hồ sơ cá nhân", href: "/staff/profile", icon: UserIcon },
 ];
-
-const ROLE_LABELS: Record<string, string> = {
-  staff: "Nhân viên",
-  tech_support: "Hỗ trợ kỹ thuật",
-};
-
-function getDisplayName(user: User, userData: Record<string, unknown> | undefined) {
-  const candidates = [
-    userData?.fullName,
-    userData?.displayName,
-    userData?.name,
-    user.displayName,
-    user.email,
-  ];
-
-  const found = candidates.find((value): value is string => typeof value === "string" && value.trim().length > 0);
-  return found ?? "Tài khoản đăng nhập";
-}
-
 
 export default function StaffLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -60,7 +41,7 @@ export default function StaffLayout({ children }: { children: ReactNode }) {
   const [roleLabel, setRoleLabel] = useState(ROLE_LABELS.staff);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user: FirebaseUser | null) => {
       if (!user) {
         setLoading(false);
         router.replace("/");
@@ -68,19 +49,18 @@ export default function StaffLayout({ children }: { children: ReactNode }) {
       }
 
       try {
-        const userSnap = await getDoc(doc(db, "users", user.uid));
-        const userData = userSnap.data() as Record<string, unknown> | undefined;
-        const role = userData?.role;
+        const { snapshot, data, role } = await loadCurrentUserRole(user.uid);
+        const workspace = getWorkspaceFromPath(pathname);
 
-        if (!userSnap.exists() || (role !== "staff" && role !== "tech_support")) {
+        if (!snapshot.exists() || !canAccessWorkspace(role, workspace)) {
           await signOut(auth);
           setLoading(false);
-          router.replace("/");
+          router.replace("/?message=" + encodeURIComponent(getAccessDeniedMessage()));
           return;
         }
 
-        setDisplayName(getDisplayName(user, userData));
-        setRoleLabel(ROLE_LABELS[String(role)] ?? ROLE_LABELS.staff);
+        setDisplayName(getDisplayName(user, data));
+        setRoleLabel(ROLE_LABELS[role ?? "staff"]);
         setLoading(false);
       } catch {
         await signOut(auth);
@@ -90,7 +70,7 @@ export default function StaffLayout({ children }: { children: ReactNode }) {
     });
 
     return () => unsubscribe();
-  }, [router]);
+  }, [pathname, router]);
 
   if (loading) {
     return (
@@ -126,7 +106,7 @@ export default function StaffLayout({ children }: { children: ReactNode }) {
                   <Icon className="h-5 w-5 shrink-0" />
                   <span>{item.label}</span>
                 </span>
-                <CornerDownLeft className="h-4 w-4 rotate-180 opacity-70" />
+                <Home className="h-4 w-4 rotate-45 opacity-70" />
               </Link>
             );
           })}
@@ -135,13 +115,13 @@ export default function StaffLayout({ children }: { children: ReactNode }) {
         <div className="mt-6 rounded-[24px] bg-[#121212] p-4 shadow-inner shadow-black/30 ring-1 ring-white/5">
           <div className="flex items-center gap-3">
             <div className="grid h-14 w-14 place-items-center rounded-full bg-[#dc2626] text-white">
-              <UserRound className="h-7 w-7" />
+              <UserIcon className="h-7 w-7" />
             </div>
             <div className="min-w-0">
               <div className="truncate text-lg font-bold text-[#f0cec9]" title={displayName}>
-                {displayName}
+                Xin chào, {displayName}
               </div>
-              <div className="text-sm text-[#9f817d]">{roleLabel}</div>
+              <div className="text-sm text-[#9f817d]">Vị trí: {roleLabel}</div>
             </div>
           </div>
           <div className="mt-4 flex gap-3">

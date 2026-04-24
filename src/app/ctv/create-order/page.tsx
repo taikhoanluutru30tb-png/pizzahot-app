@@ -4,7 +4,6 @@ import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
-  CheckCircle2,
   Minus,
   Plus,
   ShoppingCart,
@@ -54,7 +53,7 @@ type UserProfile = {
   nhom_ctv?: unknown;
 };
 
-const categories = ["Tất cả", "Pizza", "Đồ uống", "Món phụ"] as const;
+type Category = "Tất cả" | "Pizza" | "Đồ uống" | "Món phụ";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", {
   style: "currency",
@@ -82,7 +81,7 @@ function isPizzaItem(item: OrderItem) {
 
 export default function CtvCreateOrderPage() {
   const { menuItems, categories: menuCategories, loading, error: menuError } = useMenuItems();
-  const [activeCategory, setActiveCategory] = useState<(typeof categories)[number]>("Tất cả");
+  const [activeCategory, setActiveCategory] = useState<Category>("Tất cả");
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<MenuSortKey>("recommended");
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -94,18 +93,15 @@ export default function CtvCreateOrderPage() {
   });
   const [completedOrders, setCompletedOrders] = useState<OrderItem[]>([]);
   const [currentUserGroup, setCurrentUserGroup] = useState<string>("");
-  const [commissionLoading, setCommissionLoading] = useState(true);
+  const commissionLoading = completedOrders.length === 0;
 
   useEffect(() => {
     const uid = auth.currentUser?.uid;
     if (!uid) {
-      setCurrentUserGroup("");
-      setCommissionLoading(false);
       return;
     }
 
     let isActive = true;
-    setCommissionLoading(true);
 
     getDoc(doc(db, "users", uid))
       .then((snapshot) => {
@@ -118,7 +114,9 @@ export default function CtvCreateOrderPage() {
         if (isActive) setCurrentUserGroup("");
       })
       .finally(() => {
-        if (isActive) setCommissionLoading(false);
+        if (isActive) {
+          // loading state is derived from data subscription lifecycle
+        }
       });
 
     return () => {
@@ -129,7 +127,6 @@ export default function CtvCreateOrderPage() {
   useEffect(() => {
     const uid = auth.currentUser?.uid;
     if (!uid) {
-      setCompletedOrders([]);
       return;
     }
 
@@ -233,7 +230,7 @@ export default function CtvCreateOrderPage() {
               items={visibleProducts}
               categories={menuCategories}
               activeCategory={activeCategory}
-              onCategoryChange={(category) => setActiveCategory(category as (typeof categories)[number])}
+              onCategoryChange={(category) => setActiveCategory(category as Category)}
               search={search}
               onSearchChange={setSearch}
               sort={sort}

@@ -4,14 +4,11 @@ import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
-  Building,
-  ChevronDown,
   Minus,
   Plus,
   ShoppingBag,
   Sparkles,
   Trash,
-  Truck,
   User,
   X,
 } from "lucide-react";
@@ -38,13 +35,7 @@ type CustomerForm = {
   note: string;
 };
 
-const categories = ["Tất cả", "Pizza", "Đồ uống", "Món phụ"] as const;
-const sortOptions = [
-  { value: "recommended", label: "Gợi ý" },
-  { value: "price-asc", label: "Giá tăng dần" },
-  { value: "price-desc", label: "Giá giảm dần" },
-  { value: "name-asc", label: "Tên A-Z" },
-] as const;
+type Category = "Tất cả" | "Pizza" | "Đồ uống" | "Món phụ";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", {
   style: "currency",
@@ -58,21 +49,14 @@ function formatCurrency(value: number) {
 
 export default function AdminCreateOrderPage() {
   const { menuItems, categories: menuCategories, error: menuError, loading } = useMenuItems();
-  const [activeCategory, setActiveCategory] = useState<(typeof categories)[number]>("Tất cả");
+  const [activeCategory, setActiveCategory] = useState<Category>("Tất cả");
   const [sort, setSort] = useState<MenuSortKey>("recommended");
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [customer, setCustomer] = useState<CustomerForm>({ name: "", phone: "", address: "", note: "" });
-  const [loadingMenu, setLoadingMenu] = useState(true);
   const [toast, setToast] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (menuItems.length > 0) {
-      setLoadingMenu(false);
-    }
-  }, [menuItems.length]);
 
   useEffect(() => {
     if (!toast) return;
@@ -194,7 +178,7 @@ export default function AdminCreateOrderPage() {
                 items={visibleProducts}
                 categories={menuCategories}
                 activeCategory={activeCategory}
-                onCategoryChange={(category) => setActiveCategory(category as (typeof categories)[number])}
+                onCategoryChange={(category) => setActiveCategory(category as Category)}
                 search={search}
                 onSearchChange={setSearch}
                 sort={sort}
